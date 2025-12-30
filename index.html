@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kalkulator Wyceny Pro</title>
+    <title>Stolarnia Master</title>
     
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#1e293b">
+    <meta name="theme-color" content="#0f172a">
     
-    <!-- Ikona dolara/kalkulatora -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23059669%22 rx=%2220%22/><path d=%22M50 20v60M20 50h60%22 stroke=%22white%22 stroke-width=%220%22/><text x=%2250%22 y=%2270%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>$</text></svg>">
+    <!-- Ikona Aplikacji -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%230f172a%22 rx=%2220%22/><path d=%22M20 20L80 80M80 20L20 80%22 stroke=%22white%22 stroke-width=%2210%22/><rect x=%2235%22 y=%2235%22 width=%2230%22 height=%2230%22 fill=%22%233b82f6%22/></svg>">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -21,221 +21,559 @@
             font-family: 'Inter', sans-serif;
             -webkit-tap-highlight-color: transparent;
             padding-bottom: env(safe-area-inset-bottom);
+            padding-bottom: 80px; /* Miejsce na dolny pasek */
         }
         input, button { touch-action: manipulation; }
         
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .hatch-pattern {
+            background-image: repeating-linear-gradient(45deg, #fecdd3, #fecdd3 2px, transparent 2px, transparent 6px);
+        }
 
-        @media all and (display-mode: standalone) {
-            body { padding-top: env(safe-area-inset-top); }
+        /* Animacje widoków */
+        .view-section { display: none; opacity: 0; transition: opacity 0.2s; }
+        .view-section.active { display: block; opacity: 1; }
+        
+        .nav-item.active { color: #3b82f6; }
+        .nav-item.active svg { transform: translateY(-2px); }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { padding-bottom: 0; background: white; }
+            .view-section { display: block; } 
+            /* Drukuj tylko aktywny widok */
+            .view-section:not(.active) { display: none; }
         }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-100 text-slate-800 min-h-screen">
 
-    <!-- Navbar -->
-    <nav class="bg-slate-800 text-white p-4 sticky top-0 z-50 shadow-lg">
-        <div class="flex justify-between items-center max-w-lg mx-auto">
-            <div>
-                <h1 class="font-black text-lg uppercase tracking-wider">Wycena<span class="text-emerald-400">Calc</span></h1>
-                <p class="text-[10px] text-slate-400">Kosztorys Meblowy</p>
+    <!-- NAGŁÓWEK -->
+    <header class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-lg no-print">
+        <div class="flex justify-between items-center max-w-2xl mx-auto">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg shadow-blue-500/50 shadow-lg">S</div>
+                <div>
+                    <h1 class="font-black text-sm uppercase tracking-wider">Stolarnia<span class="text-blue-400">Master</span></h1>
+                    <p class="text-[9px] text-slate-400" id="header-subtitle">Wybierz narzędzie</p>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button onclick="downloadResults()" class="bg-emerald-600 active:bg-emerald-700 p-2 rounded-full shadow-lg transition-transform active:scale-95">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                </button>
-            </div>
+            <button onclick="downloadCurrent()" class="bg-slate-700 p-2 rounded-full hover:bg-slate-600 transition-colors">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </button>
         </div>
-    </nav>
+    </header>
 
-    <main class="flex-grow p-4 max-w-lg mx-auto w-full space-y-4">
-        
-        <!-- KARTA 1: MATERIAŁY -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-            <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                Koszty Materiałowe
-            </h2>
-            
-            <div class="space-y-3 mb-4">
-                <div>
-                    <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Płyty / Fronty / Blaty (zł)</label>
-                    <input type="number" id="cost-boards" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-lg transition-all">
+    <main class="p-4 max-w-2xl mx-auto w-full">
+
+        <!-- ==============================
+             WIDOK 1: FRONTY & KORPUSY 
+             ============================== -->
+        <section id="view-fronts" class="view-section">
+            <div class="space-y-4">
+                <!-- KARTA DANYCH -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        Wymiary Mebla
+                    </h2>
+                    
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        <div>
+                            <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Szerokość</label>
+                            <input type="number" id="f-width" value="600" class="w-full p-2 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-lg text-center">
+                        </div>
+                        <div>
+                            <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Wysokość</label>
+                            <input type="number" id="f-height" value="720" class="w-full p-2 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-lg text-center">
+                        </div>
+                        <div>
+                            <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Głębokość</label>
+                            <input type="number" id="f-depth" value="500" class="w-full p-2 bg-slate-50 rounded-xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-lg text-center">
+                        </div>
+                    </div>
+
+                    <!-- Szczegóły konstrukcyjne (Toggle) -->
+                    <div class="border-t border-slate-100 pt-3 mt-3">
+                        <button onclick="toggleFDetails()" class="flex items-center justify-between w-full text-left text-[10px] font-bold text-blue-600 uppercase tracking-wide mb-2">
+                            <span>Konstrukcja (Płyta/Trawers)</span>
+                            <svg id="f-arrow" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        
+                        <div id="f-details" class="hidden grid-cols-3 gap-2 mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div>
+                                <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Płyta (mm)</label>
+                                <input type="number" id="f-thick" value="18" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-center">
+                            </div>
+                            <div>
+                                <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Ilość Trawers.</label>
+                                <input type="number" id="f-trav-qty" value="2" min="0" max="5" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-center">
+                            </div>
+                            <div>
+                                <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Głęb. Trawers.</label>
+                                <input type="number" id="f-trav-depth" value="100" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-center">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Konfiguracja frontów -->
+                    <div class="mt-3 pt-3 border-t border-slate-100">
+                        <label class="text-[9px] uppercase font-bold text-slate-500 block mb-2">Typ szafki & Fronty</label>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="f-loc" value="starting" checked class="peer sr-only">
+                                <div class="p-2 border border-slate-200 rounded-lg text-center peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-700 text-slate-600 text-[11px] font-bold">
+                                    Skrajna (-3mm)
+                                </div>
+                            </label>
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="f-loc" value="in-row" class="peer sr-only">
+                                <div class="p-2 border border-slate-200 rounded-lg text-center peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-700 text-slate-600 text-[11px] font-bold">
+                                    W ciągu (-2mm)
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <div class="flex gap-2 items-center">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Ilość:</span>
+                            <input type="number" id="f-count" value="3" class="w-12 p-1 bg-slate-50 border border-slate-200 rounded text-center font-bold text-sm">
+                            <div class="flex-1 flex bg-slate-100 rounded p-1 gap-1">
+                                <button onclick="setFMode('equal')" id="btn-f-equal" class="flex-1 text-[10px] font-bold rounded shadow-sm bg-white text-blue-600">Równe</button>
+                                <button onclick="setFMode('ratio')" id="btn-f-ratio" class="flex-1 text-[10px] font-bold rounded text-slate-500">Proporcje</button>
+                            </div>
+                        </div>
+                        <div id="f-ratio-container" class="hidden mt-2">
+                            <input type="text" id="f-ratio" value="1:1:1" class="w-full p-2 border border-blue-200 rounded text-center font-mono font-bold text-xs" placeholder="np. 2:1:1">
+                            <div id="f-presets" class="flex flex-wrap gap-1 mt-1 justify-center"></div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Akcesoria / Okucia (zł)</label>
-                    <input type="number" id="cost-hardware" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-lg transition-all">
+
+                <!-- SWITCH TAB -->
+                <div class="flex bg-slate-200 p-1 rounded-xl no-print">
+                    <button onclick="switchFTab('fronts')" id="tab-f-fronts" class="flex-1 py-2 rounded-lg text-xs font-bold shadow-sm bg-white text-slate-800 transition-all">Fronty</button>
+                    <button onclick="switchFTab('carcass')" id="tab-f-carcass" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-white/50 transition-all">Korpus</button>
+                </div>
+
+                <!-- WYNIKI FRONTÓW -->
+                <div id="res-fronts" class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Lista Frontów</h2>
+                        <span id="f-badge-w" class="bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded font-bold">Szer: --</span>
+                    </div>
+                    <div id="f-error" class="hidden p-3 bg-red-50 text-red-600 text-xs font-bold rounded-lg mb-3"></div>
+                    <div id="list-fronts" class="space-y-2 max-h-60 overflow-y-auto"></div>
+                    
+                    <div class="mt-4 pt-4 border-t border-slate-100 flex justify-between items-end">
+                         <span class="text-[10px] text-slate-400">Suma wys. frontów</span>
+                         <span id="f-total-h" class="text-lg font-black text-slate-800">0 mm</span>
+                    </div>
+
+                    <!-- Schemat -->
+                    <div class="mt-6 pt-6 border-t border-dashed border-slate-200 flex justify-center">
+                        <div class="relative w-40">
+                            <div class="absolute -left-6 top-0 bottom-0 border-l border-y border-slate-500 w-3 flex items-center justify-center">
+                                <span id="label-h" class="text-[9px] -rotate-90 bg-white px-1 font-mono text-slate-400">720</span>
+                            </div>
+                            <div id="f-diagram" class="w-full flex flex-col bg-slate-700 border-2 border-slate-600 h-[200px]"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WYNIKI KORPUSU -->
+                <div id="res-carcass" class="hidden bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Rozkrój Korpusu</h2>
+                        <span id="c-badge-thick" class="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded font-bold">18 mm</span>
+                    </div>
+                    <div id="list-carcass" class="space-y-3"></div>
                 </div>
             </div>
+        </section>
 
-            <!-- Rozwijane szczegóły -->
-            <div class="border-t border-slate-100 pt-3 mt-3">
-                <button onclick="toggleDetails()" class="flex items-center justify-between w-full text-left text-[10px] font-bold text-emerald-600 uppercase tracking-wide mb-2">
-                    <span>Dodatkowe koszty (Transport/Inne)</span>
-                    <svg id="arrow-icon" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
+        <!-- ==============================
+             WIDOK 2: WYCENA
+             ============================== -->
+        <section id="view-pricing" class="view-section">
+            <div class="space-y-4">
                 
-                <div id="extra-details" class="hidden mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Inne wydatki (zł)</label>
-                    <input type="number" id="cost-other" placeholder="0.00" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold">
+                <!-- MATERIAŁY -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Koszty Materiałowe
+                    </h2>
+                    <div class="space-y-3 mb-4">
+                        <div>
+                            <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Płyty / Fronty (zł)</label>
+                            <input type="number" id="p-boards" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none font-bold text-lg">
+                        </div>
+                        <div>
+                            <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Okucia (zł)</label>
+                            <input type="number" id="p-hardware" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none font-bold text-lg">
+                        </div>
+                    </div>
                     
-                    <!-- Przełącznik wyłączenia z mnożnika -->
-                    <div class="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="exclude-other" class="sr-only peer">
-                            <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                            <span class="ml-2 text-[9px] font-bold text-slate-400 uppercase peer-checked:text-emerald-600 transition-colors">Nie mnóż tej kwoty (tylko dodaj)</span>
-                        </label>
+                    <div class="border-t border-slate-100 pt-3 mt-3">
+                        <button onclick="togglePDetails()" class="flex items-center justify-between w-full text-left text-[10px] font-bold text-emerald-600 uppercase tracking-wide mb-2">
+                            <span>Dodatkowe koszty</span>
+                            <svg id="p-arrow" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="p-extra" class="hidden mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Inne wydatki (zł)</label>
+                            <input type="number" id="p-other" placeholder="0.00" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold">
+                            <div class="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="p-exclude" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                                    <span class="ml-2 text-[9px] font-bold text-slate-400 uppercase peer-checked:text-emerald-600">Nie mnóż tej kwoty</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ROBOCIZNA -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Robocizna
+                    </h2>
+                    <div class="mb-2">
+                        <label class="text-[9px] uppercase font-bold text-blue-600 block mb-1">Mnożnik Robocizny (x)</label>
+                        <input type="number" id="p-mult" placeholder="np. 1.0" step="0.1" class="w-full p-4 bg-blue-50/50 rounded-xl border border-blue-200 focus:border-blue-500 outline-none font-bold text-center text-xl text-blue-700">
+                        <p class="text-[8px] text-slate-400 mt-2 text-center font-semibold">Robocizna = Suma Materiałów × Mnożnik</p>
+                    </div>
+                </div>
+
+                <!-- PODSUMOWANIE -->
+                <div class="bg-slate-800 rounded-2xl p-6 shadow-lg text-white">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h2>
+                    
+                    <div class="flex justify-between items-end mb-2 border-b border-slate-700 pb-2">
+                        <span class="text-sm text-slate-300">Koszt zakupu:</span>
+                        <span id="p-total-cost" class="font-mono font-bold">0.00 zł</span>
+                    </div>
+                    <div class="flex justify-between items-end mb-6 border-b border-slate-700 pb-2">
+                        <span class="text-sm text-blue-300">Robocizna:</span>
+                        <span id="p-total-labor" class="font-mono font-bold text-blue-300">0.00 zł</span>
+                    </div>
+
+                    <div class="text-center">
+                        <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">Razem do zapłaty</p>
+                        <div id="p-final-price" class="text-4xl font-black text-white">0.00 zł</div>
+                    </div>
+
+                    <div class="mt-6 h-3 w-full bg-slate-700 rounded-full flex overflow-hidden">
+                        <div id="bar-mat" class="h-full bg-emerald-500" style="width: 0%"></div>
+                        <div id="bar-lab" class="h-full bg-blue-500" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                        <span>Materiał</span>
+                        <span>Robocizna</span>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- KARTA 2: ROBOCIZNA (MNOŻNIK) -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-            <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Robocizna (Mnożnik)
-            </h2>
-
-            <div class="mb-4">
-                <div class="col-span-2 md:col-span-1">
-                    <label class="text-[9px] uppercase font-bold text-blue-600 block mb-1">Mnożnik Robocizny (x)</label>
-                    <input type="number" id="labor-multiplier" placeholder="np. 1.0" step="0.1" class="w-full p-4 bg-blue-50/50 rounded-xl border border-blue-200 focus:border-blue-500 focus:bg-white outline-none font-bold text-center text-xl text-blue-700">
-                    <p class="text-[8px] text-slate-400 mt-2 ml-1 text-center font-semibold">Wartość Robocizny = Suma Materiałów × Mnożnik</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- KARTA WYNIKÓW -->
-        <div class="bg-slate-800 rounded-2xl p-6 shadow-lg text-white">
-            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h2>
-            
-            <div class="flex justify-between items-end mb-2 border-b border-slate-700 pb-2">
-                <span class="text-sm text-slate-300">Koszt zakupu:</span>
-                <span id="total-cost" class="font-mono font-bold">0.00 zł</span>
-            </div>
-            <div class="flex justify-between items-end mb-6 border-b border-slate-700 pb-2">
-                <span class="text-sm text-blue-300">Robocizna:</span>
-                <span id="total-multiplier" class="font-mono font-bold text-blue-300">0.00 zł</span>
-            </div>
-
-            <div class="text-center">
-                <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">Razem do zapłaty</p>
-                <div id="final-price" class="text-4xl font-black text-white">0.00 zł</div>
-            </div>
-
-            <!-- Prosty pasek postępu/udziału -->
-            <div class="mt-6 h-3 w-full bg-slate-700 rounded-full flex overflow-hidden">
-                <div id="bar-mat" class="h-full bg-emerald-500" style="width: 0%"></div>
-                <div id="bar-mult" class="h-full bg-blue-500" style="width: 0%"></div>
-            </div>
-            <div class="flex justify-between text-[9px] font-bold text-slate-400 mt-1 uppercase">
-                <span>Materiał</span>
-                <span>Robocizna</span>
-            </div>
-        </div>
+        </section>
 
     </main>
 
-    <footer class="p-6 text-center text-[10px] text-slate-400">
-        Wycena Meblowa Pro v2.1
-    </footer>
+    <!-- DOLNY PASEK NAWIGACJI -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2 z-50 shadow-[0_-5px_10px_rgba(0,0,0,0.02)] no-print">
+        <div class="max-w-2xl mx-auto flex justify-around items-center">
+            
+            <button onclick="showView('fronts')" id="nav-fronts" class="nav-item active flex flex-col items-center p-2 text-slate-400 hover:text-blue-500 transition-all">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <span class="text-[10px] font-bold">Fronty</span>
+            </button>
+
+            <button onclick="showView('pricing')" id="nav-pricing" class="nav-item flex flex-col items-center p-2 text-slate-400 hover:text-emerald-500 transition-all">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                <span class="text-[10px] font-bold">Wycena</span>
+            </button>
+            
+        </div>
+    </nav>
 
     <script>
-        let resultData = {};
+        // --- LOGIKA NAWIGACJI ---
+        let currentView = 'fronts';
 
-        function toggleDetails() {
-            const el = document.getElementById('extra-details');
-            const arr = document.getElementById('arrow-icon');
-            el.classList.toggle('hidden');
-            if(el.classList.contains('hidden')) arr.style.transform = 'rotate(0deg)';
-            else arr.style.transform = 'rotate(180deg)';
+        function showView(viewName) {
+            currentView = viewName;
+            
+            // Ukryj wszystko
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-blue-600', 'text-emerald-600'));
+            
+            // Pokaż wybrane
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            
+            // Style paska
+            const btn = document.getElementById(`nav-${viewName}`);
+            const title = document.getElementById('header-subtitle');
+            
+            btn.classList.add('active');
+            if (viewName === 'fronts') {
+                btn.classList.add('text-blue-600');
+                title.innerText = "Kalkulator Frontów i Korpusów";
+            } else {
+                btn.classList.add('text-emerald-600');
+                title.innerText = "Kalkulator Kosztów";
+            }
         }
 
-        function calculate() {
-            // Pobranie danych
-            const mat = parseFloat(document.getElementById('cost-boards').value) || 0;
-            const hard = parseFloat(document.getElementById('cost-hardware').value) || 0;
-            const other = parseFloat(document.getElementById('cost-other').value) || 0;
-            const excludeOther = document.getElementById('exclude-other').checked;
+        // Init widok
+        showView('fronts');
+
+        // --- LOGIKA FRONTÓW ---
+        let fMode = 'equal';
+        let fData = { fronts: [], carcass: [], w:0, h:0, d:0 };
+
+        function toggleFDetails() {
+            const el = document.getElementById('f-details');
+            const arr = document.getElementById('f-arrow');
+            el.classList.toggle('hidden');
+            el.classList.toggle('grid');
+            arr.style.transform = el.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        function switchFTab(tab) {
+            const vF = document.getElementById('res-fronts');
+            const vC = document.getElementById('res-carcass');
+            const bF = document.getElementById('tab-f-fronts');
+            const bC = document.getElementById('tab-f-carcass');
             
-            const multValue = parseFloat(document.getElementById('labor-multiplier').value) || 0;
-
-            // Koszty materiałowe razem (zawsze suma wszystkiego w podsumowaniu kosztów)
-            const totalMaterial = mat + hard + other;
-
-            // Baza do mnożnika
-            // Jeśli excludeOther jest TRUE, baza to tylko płyty + okucia
-            // Jeśli FALSE, baza to wszystko (płyty + okucia + inne)
-            let baseForMultiplier = mat + hard;
-            if (!excludeOther) {
-                baseForMultiplier += other;
+            if(tab === 'fronts') {
+                vF.classList.remove('hidden'); vC.classList.add('hidden');
+                bF.className = "flex-1 py-2 rounded-lg text-xs font-bold shadow-sm bg-white text-slate-800 transition-all";
+                bC.className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-white/50 transition-all";
+            } else {
+                vF.classList.add('hidden'); vC.classList.remove('hidden');
+                bC.className = "flex-1 py-2 rounded-lg text-xs font-bold shadow-sm bg-white text-slate-800 transition-all";
+                bF.className = "flex-1 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-white/50 transition-all";
             }
-            
-            // Obliczenie robocizny z mnożnika
-            const multiplierAmount = baseForMultiplier * multValue;
-            
-            // Cena Końcowa = Materiał (cały) + Robocizna
-            const totalPrice = totalMaterial + multiplierAmount;
+        }
 
-            // Wyświetlanie
-            document.getElementById('total-cost').innerText = formatPLN(totalMaterial);
-            document.getElementById('total-multiplier').innerText = formatPLN(multiplierAmount);
-            document.getElementById('final-price').innerText = formatPLN(totalPrice);
+        function setFMode(mode) {
+            fMode = mode;
+            document.getElementById('f-ratio-container').classList.toggle('hidden', mode === 'equal');
+            const bEq = document.getElementById('btn-f-equal');
+            const bRa = document.getElementById('btn-f-ratio');
+            if(mode === 'equal') {
+                bEq.className = "flex-1 text-[10px] font-bold rounded shadow-sm bg-white text-blue-600 transition-all";
+                bRa.className = "flex-1 text-[10px] font-bold rounded text-slate-500 transition-all";
+            } else {
+                bRa.className = "flex-1 text-[10px] font-bold rounded shadow-sm bg-white text-blue-600 transition-all";
+                bEq.className = "flex-1 text-[10px] font-bold rounded text-slate-500 transition-all";
+                updateFPresets();
+            }
+            calcFronts();
+        }
 
-            // Wykres paskowy
-            if (totalPrice > 0) {
-                const pMat = (totalMaterial / totalPrice) * 100;
-                const pMult = (multiplierAmount / totalPrice) * 100;
+        function updateFPresets() {
+            const N = parseInt(document.getElementById('f-count').value) || 0;
+            const container = document.getElementById('f-presets');
+            container.innerHTML = '';
+            if (N < 2) return;
+            let opts = [];
+            if (N===3) opts = ['1:2:2', '2:2:1', '1:1:2'];
+            else if (N===4) opts = ['1:2:2:2', '2:2:2:1'];
+            else if (N===5) opts = ['1:1:1:2:2'];
+            opts.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = "px-2 py-1 bg-white border border-slate-200 text-slate-600 text-[9px] font-bold rounded hover:bg-blue-50 transition-all";
+                btn.innerText = p;
+                btn.onclick = () => { document.getElementById('f-ratio').value = p; calcFronts(); };
+                container.appendChild(btn);
+            });
+        }
+
+        function calcFronts() {
+            const W = parseFloat(document.getElementById('f-width').value) || 0;
+            const H = parseFloat(document.getElementById('f-height').value) || 0;
+            const D = parseFloat(document.getElementById('f-depth').value) || 0;
+            const THICK = parseFloat(document.getElementById('f-thick').value) || 18;
+            const TRAV_QTY = parseInt(document.getElementById('f-trav-qty').value) || 0;
+            const TRAV_D = parseFloat(document.getElementById('f-trav-depth').value) || 100;
+            const N = parseInt(document.getElementById('f-count').value) || 1;
+            const loc = document.querySelector('input[name="f-loc"]:checked').value;
+            const ratioVal = document.getElementById('f-ratio').value;
+
+            // Logika frontów
+            let gapLeft = loc === 'starting' ? 2 : 1;
+            let gapRight = 1;
+            const finalW = Math.round(W - (gapLeft + gapRight));
+            const gapsH = 4 + 2 + (Math.max(0, N-1) * 2);
+            const availH = H - gapsH;
+
+            const listF = document.getElementById('list-fronts');
+            const diag = document.getElementById('f-diagram');
+            const err = document.getElementById('f-error');
+            
+            listF.innerHTML = ''; diag.innerHTML = ''; err.classList.add('hidden');
+            document.getElementById('f-badge-w').innerText = `Szer: ${finalW} mm`;
+            document.getElementById('label-h').innerText = H;
+            document.getElementById('c-badge-thick').innerText = `${THICK} mm`;
+
+            if(availH <= 0 || finalW <= 0) {
+                err.innerText = "Błąd wymiarów!"; err.classList.remove('hidden'); return;
+            }
+
+            let heights = [];
+            if(fMode === 'equal') for(let i=0; i<N; i++) heights.push(availH/N);
+            else {
+                const parts = ratioVal.split(':').map(x => parseFloat(x)||1);
+                const sum = parts.reduce((a,b)=>a+b,0);
+                if(sum>0) heights = parts.map(p => (p/sum)*availH);
+                else heights = [availH];
+            }
+            const roundedH = heights.map(h => Math.round(h));
+            document.getElementById('f-total-h').innerText = roundedH.reduce((a,b)=>a+b,0) + ' mm';
+
+            // Render
+            renderGap(diag, 4);
+            roundedH.forEach((h, i) => {
+                listF.innerHTML += `
+                    <div class="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">F${i+1}</span>
+                        <span class="font-mono font-bold text-slate-800">${finalW} x ${h}</span>
+                    </div>`;
                 
+                const row = document.createElement('div');
+                row.className = "w-full flex relative";
+                row.style.flexGrow = h; row.style.minHeight = "15px";
+                const gL = `<div class="h-full hatch-pattern border-r border-red-300/30 bg-red-50 flex items-center justify-center shrink-0" style="width:${gapLeft===2?'10px':'5px'}"></div>`;
+                const gR = `<div class="h-full hatch-pattern border-l border-red-300/30 bg-red-50 flex items-center justify-center shrink-0" style="width:${gapRight===2?'10px':'5px'}"></div>`;
+                row.innerHTML = `${gL}<div class="flex-grow bg-blue-500 flex items-center justify-center text-[9px] text-white font-bold">${h}</div>${gR}`;
+                diag.appendChild(row);
+                if(i < N-1) renderGap(diag, 2);
+            });
+            renderGap(diag, 2);
+
+            // Korpus
+            const carcassData = [
+                { name: 'Bok', qty: 2, dim1: H, dim2: D },
+                { name: 'Dno', qty: 1, dim1: W-(2*THICK), dim2: D }
+            ];
+            if(TRAV_QTY > 0) carcassData.push({ name: 'Trawers', qty: TRAV_QTY, dim1: W-(2*THICK), dim2: TRAV_D });
+
+            const listC = document.getElementById('list-carcass');
+            listC.innerHTML = '';
+            carcassData.forEach(el => {
+                listC.innerHTML += `
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div class="flex items-center gap-3">
+                            <span class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 shadow-sm">${el.qty}x</span>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${el.name}</p>
+                                <p class="font-mono font-bold text-slate-800 text-lg">${Math.round(el.dim1)} x ${Math.round(el.dim2)}</p>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            fData = { w: finalW, h: H, fronts: roundedH, carcass: carcassData };
+        }
+
+        // --- LOGIKA WYCENY ---
+        let pData = {};
+
+        function togglePDetails() {
+            const el = document.getElementById('p-extra');
+            const arr = document.getElementById('p-arrow');
+            el.classList.toggle('hidden');
+            arr.style.transform = el.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        function calcPricing() {
+            const mat = parseFloat(document.getElementById('p-boards').value) || 0;
+            const hard = parseFloat(document.getElementById('p-hardware').value) || 0;
+            const other = parseFloat(document.getElementById('p-other').value) || 0;
+            const exclude = document.getElementById('p-exclude').checked;
+            const mult = parseFloat(document.getElementById('p-mult').value) || 0;
+
+            const totalMat = mat + hard + other;
+            let base = mat + hard;
+            if(!exclude) base += other;
+
+            const labor = base * mult;
+            const total = totalMat + labor;
+
+            document.getElementById('p-total-cost').innerText = formatPLN(totalMat);
+            document.getElementById('p-total-labor').innerText = formatPLN(labor);
+            document.getElementById('p-final-price').innerText = formatPLN(total);
+
+            if(total > 0) {
+                const pMat = (totalMat/total)*100;
+                const pLab = (labor/total)*100;
                 document.getElementById('bar-mat').style.width = `${pMat}%`;
-                document.getElementById('bar-mult').style.width = `${pMult}%`;
+                document.getElementById('bar-lab').style.width = `${pLab}%`;
             } else {
                 document.getElementById('bar-mat').style.width = `0%`;
-                document.getElementById('bar-mult').style.width = `0%`;
+                document.getElementById('bar-lab').style.width = `0%`;
             }
 
-            resultData = {
-                mat: totalMaterial,
-                lab: multiplierAmount,
-                multVal: multValue,
-                total: totalPrice
-            };
+            pData = { mat: totalMat, labor: labor, total: total, mult: mult };
         }
 
-        function formatPLN(num) {
-            return num.toFixed(2) + ' zł';
+        // --- POMOCNICZE ---
+        function renderGap(parent, size) {
+            const el = document.createElement('div');
+            el.className = "w-full hatch-pattern border-y border-red-300/30 flex items-center justify-center shrink-0 bg-red-50";
+            el.style.height = "12px";
+            parent.appendChild(el);
         }
+        function formatPLN(n) { return n.toFixed(2) + ' zł'; }
 
-        function downloadResults() {
-            if (!resultData.total) return;
+        function downloadCurrent() {
             const d = new Date().toLocaleDateString();
-            let txt = `KOSZTORYS - ${d}\n========================\n`;
-            txt += `Materiały i akcesoria: ${formatPLN(resultData.mat)}\n`;
-            txt += `Robocizna (Mnożnik x${resultData.multVal}): ${formatPLN(resultData.lab)}\n`;
-            txt += `------------------------\n`;
-            txt += `RAZEM: ${formatPLN(resultData.total)}\n`;
+            let txt = `RAPORT STOLARNIA MASTER - ${d}\n============================\n`;
+
+            if(currentView === 'fronts') {
+                if(!fData.fronts.length) return;
+                txt += `[FRONTY I KORPUSY]\n`;
+                txt += `Gabaryt: ${document.getElementById('f-width').value}x${fData.h}x${document.getElementById('f-depth').value} mm\n\n`;
+                txt += `FRONTY (Szer: ${fData.w}mm):\n`;
+                fData.fronts.forEach((h,i)=> txt += `${i+1}. ${fData.w} x ${h}\n`);
+                txt += `\nKORPUS (Płyta: ${document.getElementById('f-thick').value}mm):\n`;
+                fData.carcass.forEach(el => txt += `${el.qty}x ${el.name}: ${Math.round(el.dim1)} x ${Math.round(el.dim2)}\n`);
+            } else {
+                if(!pData.total) return;
+                txt += `[WYCENA]\n`;
+                txt += `Materiały: ${formatPLN(pData.mat)}\n`;
+                txt += `Robocizna (Mnożnik x${pData.mult}): ${formatPLN(pData.labor)}\n`;
+                txt += `----------------------------\n`;
+                txt += `RAZEM: ${formatPLN(pData.total)}\n`;
+            }
 
             const blob = new Blob([txt], {type: 'text/plain'});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = 'wycena.txt';
+            a.download = `stolarnia_${currentView}.txt`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
         }
 
-        // Listenery
-        ['cost-boards', 'cost-hardware', 'cost-other', 'labor-multiplier'].forEach(id => {
-            document.getElementById(id).addEventListener('input', calculate);
-        });
+        // LISTENERY
+        // Fronts
+        ['f-width','f-height','f-depth','f-count','f-ratio','f-thick','f-trav-qty','f-trav-depth'].forEach(id => 
+            document.getElementById(id).addEventListener('input', () => {
+                if(id==='f-count' && fMode==='ratio') updateFPresets();
+                calcFronts();
+            })
+        );
+        document.querySelectorAll('input[name="f-loc"]').forEach(r => r.addEventListener('change', calcFronts));
         
-        document.getElementById('exclude-other').addEventListener('change', calculate);
+        // Pricing
+        ['p-boards','p-hardware','p-other','p-mult'].forEach(id => 
+            document.getElementById(id).addEventListener('input', calcPricing)
+        );
+        document.getElementById('p-exclude').addEventListener('change', calcPricing);
 
-        // Start
-        window.onload = calculate;
+        // Init
+        calcFronts();
+        calcPricing();
     </script>
 </body>
 </html>
