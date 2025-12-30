@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kalkulator Wyceny Pro</title>
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e293b">
+    
+    <!-- Ikona dolara/kalkulatora -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23059669%22 rx=%2220%22/><path d=%22M50 20v60M20 50h60%22 stroke=%22white%22 stroke-width=%220%22/><text x=%2250%22 y=%2270%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>$</text></svg>">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+        body {
+            background-color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        input, button { touch-action: manipulation; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media all and (display-mode: standalone) {
+            body { padding-top: env(safe-area-inset-top); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-slate-800 text-white p-4 sticky top-0 z-50 shadow-lg">
+        <div class="flex justify-between items-center max-w-lg mx-auto">
+            <div>
+                <h1 class="font-black text-lg uppercase tracking-wider">Wycena<span class="text-emerald-400">Calc</span></h1>
+                <p class="text-[10px] text-slate-400">Kosztorys Meblowy</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="downloadResults()" class="bg-emerald-600 active:bg-emerald-700 p-2 rounded-full shadow-lg transition-transform active:scale-95">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow p-4 max-w-lg mx-auto w-full space-y-4">
+        
+        <!-- KARTA 1: MATERIAŁY -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+            <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                Koszty Materiałowe
+            </h2>
+            
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Płyty / Fronty / Blaty (zł)</label>
+                    <input type="number" id="cost-boards" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-lg transition-all">
+                </div>
+                <div>
+                    <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Akcesoria / Okucia (zł)</label>
+                    <input type="number" id="cost-hardware" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-emerald-500 focus:bg-white outline-none font-bold text-lg transition-all">
+                </div>
+            </div>
+
+            <!-- Rozwijane szczegóły -->
+            <div class="border-t border-slate-100 pt-3 mt-3">
+                <button onclick="toggleDetails()" class="flex items-center justify-between w-full text-left text-[10px] font-bold text-emerald-600 uppercase tracking-wide mb-2">
+                    <span>Dodatkowe koszty (Transport/Inne)</span>
+                    <svg id="arrow-icon" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="extra-details" class="hidden mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <label class="text-[9px] uppercase font-bold text-slate-500 block mb-1">Inne wydatki (zł)</label>
+                    <input type="number" id="cost-other" placeholder="0.00" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold">
+                    
+                    <!-- Przełącznik wyłączenia z mnożnika -->
+                    <div class="mt-3 flex items-center gap-2 pt-2 border-t border-slate-100">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="exclude-other" class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            <span class="ml-2 text-[9px] font-bold text-slate-400 uppercase peer-checked:text-emerald-600 transition-colors">Nie mnóż tej kwoty (tylko dodaj)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KARTA 2: ROBOCIZNA (MNOŻNIK) -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+            <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Robocizna (Mnożnik)
+            </h2>
+
+            <div class="mb-4">
+                <div class="col-span-2 md:col-span-1">
+                    <label class="text-[9px] uppercase font-bold text-blue-600 block mb-1">Mnożnik Robocizny (x)</label>
+                    <input type="number" id="labor-multiplier" placeholder="np. 1.0" step="0.1" class="w-full p-4 bg-blue-50/50 rounded-xl border border-blue-200 focus:border-blue-500 focus:bg-white outline-none font-bold text-center text-xl text-blue-700">
+                    <p class="text-[8px] text-slate-400 mt-2 ml-1 text-center font-semibold">Wartość Robocizny = Suma Materiałów × Mnożnik</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- KARTA WYNIKÓW -->
+        <div class="bg-slate-800 rounded-2xl p-6 shadow-lg text-white">
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Podsumowanie</h2>
+            
+            <div class="flex justify-between items-end mb-2 border-b border-slate-700 pb-2">
+                <span class="text-sm text-slate-300">Koszt zakupu:</span>
+                <span id="total-cost" class="font-mono font-bold">0.00 zł</span>
+            </div>
+            <div class="flex justify-between items-end mb-6 border-b border-slate-700 pb-2">
+                <span class="text-sm text-blue-300">Robocizna:</span>
+                <span id="total-multiplier" class="font-mono font-bold text-blue-300">0.00 zł</span>
+            </div>
+
+            <div class="text-center">
+                <p class="text-[10px] text-slate-400 uppercase font-bold mb-1">Razem do zapłaty</p>
+                <div id="final-price" class="text-4xl font-black text-white">0.00 zł</div>
+            </div>
+
+            <!-- Prosty pasek postępu/udziału -->
+            <div class="mt-6 h-3 w-full bg-slate-700 rounded-full flex overflow-hidden">
+                <div id="bar-mat" class="h-full bg-emerald-500" style="width: 0%"></div>
+                <div id="bar-mult" class="h-full bg-blue-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                <span>Materiał</span>
+                <span>Robocizna</span>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="p-6 text-center text-[10px] text-slate-400">
+        Wycena Meblowa Pro v2.1
+    </footer>
+
+    <script>
+        let resultData = {};
+
+        function toggleDetails() {
+            const el = document.getElementById('extra-details');
+            const arr = document.getElementById('arrow-icon');
+            el.classList.toggle('hidden');
+            if(el.classList.contains('hidden')) arr.style.transform = 'rotate(0deg)';
+            else arr.style.transform = 'rotate(180deg)';
+        }
+
+        function calculate() {
+            // Pobranie danych
+            const mat = parseFloat(document.getElementById('cost-boards').value) || 0;
+            const hard = parseFloat(document.getElementById('cost-hardware').value) || 0;
+            const other = parseFloat(document.getElementById('cost-other').value) || 0;
+            const excludeOther = document.getElementById('exclude-other').checked;
+            
+            const multValue = parseFloat(document.getElementById('labor-multiplier').value) || 0;
+
+            // Koszty materiałowe razem (zawsze suma wszystkiego w podsumowaniu kosztów)
+            const totalMaterial = mat + hard + other;
+
+            // Baza do mnożnika
+            // Jeśli excludeOther jest TRUE, baza to tylko płyty + okucia
+            // Jeśli FALSE, baza to wszystko (płyty + okucia + inne)
+            let baseForMultiplier = mat + hard;
+            if (!excludeOther) {
+                baseForMultiplier += other;
+            }
+            
+            // Obliczenie robocizny z mnożnika
+            const multiplierAmount = baseForMultiplier * multValue;
+            
+            // Cena Końcowa = Materiał (cały) + Robocizna
+            const totalPrice = totalMaterial + multiplierAmount;
+
+            // Wyświetlanie
+            document.getElementById('total-cost').innerText = formatPLN(totalMaterial);
+            document.getElementById('total-multiplier').innerText = formatPLN(multiplierAmount);
+            document.getElementById('final-price').innerText = formatPLN(totalPrice);
+
+            // Wykres paskowy
+            if (totalPrice > 0) {
+                const pMat = (totalMaterial / totalPrice) * 100;
+                const pMult = (multiplierAmount / totalPrice) * 100;
+                
+                document.getElementById('bar-mat').style.width = `${pMat}%`;
+                document.getElementById('bar-mult').style.width = `${pMult}%`;
+            } else {
+                document.getElementById('bar-mat').style.width = `0%`;
+                document.getElementById('bar-mult').style.width = `0%`;
+            }
+
+            resultData = {
+                mat: totalMaterial,
+                lab: multiplierAmount,
+                multVal: multValue,
+                total: totalPrice
+            };
+        }
+
+        function formatPLN(num) {
+            return num.toFixed(2) + ' zł';
+        }
+
+        function downloadResults() {
+            if (!resultData.total) return;
+            const d = new Date().toLocaleDateString();
+            let txt = `KOSZTORYS - ${d}\n========================\n`;
+            txt += `Materiały i akcesoria: ${formatPLN(resultData.mat)}\n`;
+            txt += `Robocizna (Mnożnik x${resultData.multVal}): ${formatPLN(resultData.lab)}\n`;
+            txt += `------------------------\n`;
+            txt += `RAZEM: ${formatPLN(resultData.total)}\n`;
+
+            const blob = new Blob([txt], {type: 'text/plain'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'wycena.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Listenery
+        ['cost-boards', 'cost-hardware', 'cost-other', 'labor-multiplier'].forEach(id => {
+            document.getElementById(id).addEventListener('input', calculate);
+        });
+        
+        document.getElementById('exclude-other').addEventListener('change', calculate);
+
+        // Start
+        window.onload = calculate;
+    </script>
+</body>
+</html>
