@@ -21,27 +21,35 @@
             font-family: 'Inter', sans-serif;
             -webkit-tap-highlight-color: transparent;
             padding-bottom: env(safe-area-inset-bottom);
-            padding-bottom: 80px; /* Miejsce na dolny pasek */
+            padding-bottom: 90px;
         }
-        input, button { touch-action: manipulation; }
+        input, button, select, textarea { touch-action: manipulation; }
         
         .hatch-pattern {
             background-image: repeating-linear-gradient(45deg, #fecdd3, #fecdd3 2px, transparent 2px, transparent 6px);
         }
 
-        /* Animacje widoków */
         .view-section { display: none; opacity: 0; transition: opacity 0.2s; }
         .view-section.active { display: block; opacity: 1; }
         
-        .nav-item.active { color: #3b82f6; }
-        .nav-item.active svg { transform: translateY(-2px); }
+        .nav-item.active { transform: translateY(-4px); }
+        .nav-item.active svg { filter: drop-shadow(0 4px 3px rgba(0,0,0,0.1)); }
+        
+        /* Chat Bubble Styles */
+        .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.4; margin-bottom: 8px; }
+        .chat-user { background-color: #3b82f6; color: white; align-self: flex-end; border-bottom-right-radius: 2px; margin-left: auto; }
+        .chat-ai { background-color: #ffffff; border: 1px solid #e2e8f0; color: #334155; align-self: flex-start; border-bottom-left-radius: 2px; margin-right: auto; }
+        .typing-dot { animation: typing 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
         @media print {
             .no-print { display: none !important; }
             body { padding-bottom: 0; background: white; }
             .view-section { display: block; } 
-            /* Drukuj tylko aktywny widok */
             .view-section:not(.active) { display: none; }
+            #view-assistant { display: none !important; }
         }
     </style>
 </head>
@@ -197,7 +205,160 @@
         </section>
 
         <!-- ==============================
-             WIDOK 2: WYCENA
+             WIDOK 2: SZUFLADY
+             ============================== -->
+        <section id="view-drawers" class="view-section">
+            <div class="space-y-4">
+                
+                <!-- PARAMETRY KORPUSU -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path></svg>
+                        Dane Korpusu
+                    </h2>
+
+                    <!-- Inputs KB / Grubość -->
+                    <div class="grid grid-cols-2 gap-3 mb-2">
+                        <div>
+                            <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Szer. Zewn. (KB)</label>
+                            <input type="number" id="d-kb" value="600" class="w-full p-2 bg-slate-50 rounded-xl border border-slate-200 focus:border-amber-500 outline-none font-bold text-lg text-center">
+                        </div>
+                        <div>
+                            <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Grubość Płyty</label>
+                            <input type="number" id="d-board-thick" value="18" class="w-full p-2 bg-slate-50 rounded-xl border border-slate-200 focus:border-amber-500 outline-none font-bold text-lg text-center">
+                        </div>
+                    </div>
+                    
+                    <!-- Display LW -->
+                    <div class="flex justify-center mb-4">
+                        <div class="bg-amber-50 px-4 py-1 rounded-full border border-amber-100">
+                            <span class="text-[9px] font-bold text-amber-600 uppercase">Szer. Wewnętrzna (LW): </span>
+                            <span id="d-lw-display" class="text-sm font-black text-amber-800">564 mm</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KONFIGURACJA SYSTEMU -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"></path></svg>
+                        System Szuflad
+                    </h2>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                         <div class="col-span-2">
+                            <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Firma</label>
+                            <select id="d-brand" class="w-full p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                <option value="blum">Blum</option>
+                                <option value="sevroll">Sevroll</option>
+                                <option value="gtv">GTV</option>
+                            </select>
+                         </div>
+                         
+                         <!-- Model (dla Blum) -->
+                         <div id="d-model-container" class="col-span-2 md:col-span-1">
+                            <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Model</label>
+                            <select id="d-model" class="w-full p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                <!-- Options populated by JS -->
+                            </select>
+                         </div>
+
+                         <!-- Wysokość (dla Tandembox) -->
+                         <div id="d-height-container" class="col-span-2 md:col-span-1">
+                            <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Wysokość</label>
+                            <select id="d-height" class="w-full p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                <!-- Options populated by JS -->
+                            </select>
+                         </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3 mb-3 pt-3 border-t border-slate-100">
+                        <div>
+                            <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Dł. Prowadnicy (NL)</label>
+                            <!-- UPDATED: Select instead of Input -->
+                            <select id="d-nl" class="w-full p-2 bg-slate-50 rounded-lg border border-slate-200 focus:border-amber-500 outline-none font-bold text-center text-sm text-slate-700">
+                                <option value="270">270 mm</option>
+                                <option value="300">300 mm</option>
+                                <option value="350">350 mm</option>
+                                <option value="400">400 mm</option>
+                                <option value="450">450 mm</option>
+                                <option value="500" selected>500 mm</option>
+                                <option value="550">550 mm</option>
+                                <option value="600">600 mm</option>
+                                <option value="650">650 mm</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Gr. Dna/Tyłu</label>
+                            <input type="number" id="d-mat-thick" value="16" class="w-full p-2 bg-slate-50 rounded-lg border border-slate-200 focus:border-amber-500 outline-none font-bold text-center text-sm">
+                        </div>
+                    </div>
+
+                    <!-- Edycja Parametrów -->
+                    <div class="mt-2">
+                        <button onclick="toggleDDetails()" class="flex items-center justify-between w-full text-left text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-2">
+                            <span>Zaawansowane (Korekty)</span>
+                            <svg id="d-arrow" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        
+                        <div id="d-advanced" class="hidden grid-cols-2 gap-3 mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div>
+                                <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Dno: Odejmij od LW</label>
+                                <input type="number" id="d-red-w" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-center">
+                            </div>
+                            <div>
+                                <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Dno: Odejmij od NL</label>
+                                <input type="number" id="d-red-l" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-center">
+                            </div>
+                            <div>
+                                <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Tył: Odejmij od LW</label>
+                                <input type="number" id="d-red-back-w" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-center">
+                            </div>
+                            <div>
+                                <label class="text-[8px] uppercase font-bold text-slate-500 block mb-1">Tył: Wysokość (H)</label>
+                                <input type="number" id="d-back-h" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-center">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WYNIKI SZUFLAD -->
+                <div class="bg-amber-50 rounded-2xl p-5 shadow-sm border border-amber-100">
+                    <h2 class="text-xs font-bold text-amber-800 uppercase tracking-widest mb-4">Formatki do cięcia</h2>
+                    
+                    <div id="d-results-list" class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-amber-200 shadow-sm">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dno szuflady</p>
+                                <p class="font-mono font-bold text-slate-800 text-xl"><span id="res-d-bot-w">0</span> x <span id="res-d-bot-d">0</span></p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[10px] font-bold text-amber-600 block">1 szt.</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-amber-200 shadow-sm">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ścianka tylna szuflady</p>
+                                <p class="font-mono font-bold text-slate-800 text-xl"><span id="res-d-back-w">0</span> x <span id="res-d-back-h">0</span></p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[10px] font-bold text-amber-600 block">1 szt.</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-[9px] text-amber-700/60 mt-4 text-center">
+                        Wymiary w mm. Sprawdź grubość płyty dla dna i tyłu.
+                    </p>
+                </div>
+
+            </div>
+        </section>
+
+
+        <!-- ==============================
+             WIDOK 3: WYCENA
              ============================== -->
         <section id="view-pricing" class="view-section">
             <div class="space-y-4">
@@ -277,6 +438,41 @@
                         <span>Materiał</span>
                         <span>Robocizna</span>
                     </div>
+                    
+                    <!-- NEW AI OFFER BUTTON -->
+                    <div class="mt-6 pt-4 border-t border-slate-700">
+                        <button onclick="generateOffer()" id="btn-ai-offer" class="w-full py-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-xl font-bold text-sm text-white shadow-lg flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+                            <span>✨ Generuj Opis Oferty AI</span>
+                        </button>
+                        <div id="ai-offer-result" class="hidden mt-3">
+                            <label class="text-[9px] uppercase font-bold text-slate-400 block mb-1">Treść dla klienta:</label>
+                            <textarea id="ai-offer-text" class="w-full p-3 bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-600 focus:outline-none focus:border-indigo-500 h-32" readonly></textarea>
+                            <button onclick="copyOffer()" class="mt-2 w-full py-2 bg-slate-700 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-600">Kopiuj do schowka</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- ==============================
+             WIDOK 4: ASYSTENT AI (NOWY)
+             ============================== -->
+        <section id="view-assistant" class="view-section">
+            <div class="flex flex-col h-[calc(100vh-180px)]">
+                <!-- Chat Container -->
+                <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4 bg-white rounded-2xl shadow-sm border border-slate-200 mb-4">
+                    <div class="chat-bubble chat-ai">
+                        Cześć! Jestem Twoim wirtualnym pomocnikiem stolarskim. 🪵<br>
+                        Zapytaj mnie o montaż szuflad, dobór wkrętów lub obliczenia. W czym mogę pomóc?
+                    </div>
+                </div>
+                
+                <!-- Chat Input -->
+                <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex gap-2">
+                    <input type="text" id="chat-input" placeholder="Wpisz pytanie..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    <button onclick="sendChatMessage()" id="chat-send-btn" class="bg-blue-600 text-white rounded-xl p-3 hover:bg-blue-700 transition-colors disabled:opacity-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    </button>
                 </div>
             </div>
         </section>
@@ -292,15 +488,131 @@
                 <span class="text-[10px] font-bold">Fronty</span>
             </button>
 
+            <button onclick="showView('drawers')" id="nav-drawers" class="nav-item flex flex-col items-center p-2 text-slate-400 hover:text-amber-500 transition-all">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path></svg>
+                <span class="text-[10px] font-bold">Szuflady</span>
+            </button>
+
             <button onclick="showView('pricing')" id="nav-pricing" class="nav-item flex flex-col items-center p-2 text-slate-400 hover:text-emerald-500 transition-all">
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                 <span class="text-[10px] font-bold">Wycena</span>
+            </button>
+            
+            <button onclick="showView('assistant')" id="nav-assistant" class="nav-item flex flex-col items-center p-2 text-slate-400 hover:text-indigo-500 transition-all">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                <span class="text-[10px] font-bold">Asystent</span>
             </button>
             
         </div>
     </nav>
 
     <script>
+        // --- API GEMINI ---
+        const apiKey = ""; // Klucz zostanie dodany w środowisku uruchomieniowym
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+        async function callGemini(promptText, systemInstructionText = "") {
+            const body = {
+                contents: [{ parts: [{ text: promptText }] }]
+            };
+            if(systemInstructionText) {
+                body.systemInstruction = { parts: [{ text: systemInstructionText }] };
+            }
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd generowania odpowiedzi.";
+            } catch (e) {
+                console.error(e);
+                return "Wystąpił błąd połączenia z API.";
+            }
+        }
+
+        // --- FUNKCJE ASYSTENTA AI ---
+        async function generateOffer() {
+            if(!pData.total || pData.total <= 0) {
+                alert("Najpierw uzupełnij dane wyceny!");
+                return;
+            }
+
+            const btn = document.getElementById('btn-ai-offer');
+            const resDiv = document.getElementById('ai-offer-result');
+            const textArea = document.getElementById('ai-offer-text');
+            
+            // UI Loading
+            const originalBtnText = btn.innerHTML;
+            btn.innerHTML = `<span class="typing-dot">.</span><span class="typing-dot">.</span><span class="typing-dot">.</span> Generowanie`;
+            btn.disabled = true;
+
+            const prompt = `
+                Jesteś profesjonalnym stolarzem. Napisz krótką, uprzejmą wiadomość email/SMS do klienta z ofertą na wykonanie mebli na wymiar.
+                Dane wyceny:
+                Koszt materiałów i akcesoriów: ${formatPLN(pData.mat)}
+                Robocizna: ${formatPLN(pData.labor)}
+                Całkowita kwota do zapłaty: ${formatPLN(pData.total)}
+                
+                Instrukcje:
+                1. Bądź uprzejmy i profesjonalny.
+                2. Podaj ostateczną cenę.
+                3. Wspomnij, że cena obejmuje wysokiej jakości materiały i precyzyjny montaż.
+                4. Nie rozbijaj kosztów na czynniki pierwsze (materiał/robocizna) chyba że to konieczne, lepiej podać sumę lub ogólny zarys. Skup się na wartości dla klienta.
+                5. Zachęć do kontaktu w celu omówienia szczegółów.
+                6. Język polski.
+            `;
+
+            const response = await callGemini(prompt);
+            
+            textArea.value = response;
+            resDiv.classList.remove('hidden');
+            btn.innerHTML = originalBtnText;
+            btn.disabled = false;
+        }
+
+        function copyOffer() {
+            const txt = document.getElementById('ai-offer-text');
+            txt.select();
+            document.execCommand('copy'); // Fallback for simple copy
+            alert("Skopiowano do schowka!");
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const history = document.getElementById('chat-history');
+            const btn = document.getElementById('chat-send-btn');
+            const msg = input.value.trim();
+
+            if(!msg) return;
+
+            // User Message
+            history.innerHTML += `<div class="chat-bubble chat-user">${msg}</div>`;
+            input.value = '';
+            history.scrollTop = history.scrollHeight;
+
+            // Loading state
+            btn.disabled = true;
+            const loadingId = 'loading-' + Date.now();
+            history.innerHTML += `<div id="${loadingId}" class="chat-bubble chat-ai"><span class="typing-dot">.</span><span class="typing-dot">.</span><span class="typing-dot">.</span></div>`;
+            history.scrollTop = history.scrollHeight;
+
+            // System prompt
+            const sysPrompt = "Jesteś ekspertem stolarstwa meblowego. Znasz systemy Blum, GTV, Sevroll. Pomagasz w obliczeniach, montażu i doborze materiałów. Odpowiadaj krótko, konkretnie i fachowo.";
+            
+            const response = await callGemini(msg, sysPrompt);
+
+            // Replace loading with response
+            document.getElementById(loadingId).remove();
+            // Format simple markdown bold if present
+            const cleanResponse = response.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+            history.innerHTML += `<div class="chat-bubble chat-ai">${cleanResponse}</div>`;
+            history.scrollTop = history.scrollHeight;
+            btn.disabled = false;
+        }
+
         // --- LOGIKA NAWIGACJI ---
         let currentView = 'fronts';
 
@@ -309,7 +621,7 @@
             
             // Ukryj wszystko
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-blue-600', 'text-emerald-600'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-blue-600', 'text-amber-600', 'text-emerald-600', 'text-indigo-500'));
             
             // Pokaż wybrane
             document.getElementById(`view-${viewName}`).classList.add('active');
@@ -322,19 +634,191 @@
             if (viewName === 'fronts') {
                 btn.classList.add('text-blue-600');
                 title.innerText = "Kalkulator Frontów i Korpusów";
-            } else {
+            } else if (viewName === 'drawers') {
+                btn.classList.add('text-amber-600');
+                title.innerText = "Kalkulator Szuflad";
+            } else if (viewName === 'pricing') {
                 btn.classList.add('text-emerald-600');
                 title.innerText = "Kalkulator Kosztów";
+            } else {
+                btn.classList.add('text-indigo-500');
+                title.innerText = "Asystent Stolarza AI";
             }
         }
 
         // Init widok
         showView('fronts');
 
-        // --- LOGIKA FRONTÓW ---
+        // --- DANE I KONFIGURACJA SZUFLAD ---
+        const drawerSystems = {
+            blum: {
+                name: "Blum",
+                models: {
+                    tandembox: {
+                        name: "Tandembox",
+                        heights: {
+                            n: { label: "N (82.5mm)", backH: 69 },
+                            m: { label: "M (98.5mm) - (Możliwa Wewn.)", backH: 84 },
+                            k: { label: "K (130.5mm) - (Możliwa Wewn.)", backH: 116 },
+                            c: { label: "C (192mm) - (Możliwa Wewn.)", backH: 167 },
+                            d: { label: "D (224mm) - (Możliwa Wewn.)", backH: 199 }
+                        },
+                        redBottomW: 75,
+                        redBottomL: 24,
+                        redBackW: 87
+                    },
+                    merivobox: {
+                        name: "Merivobox",
+                        heights: {
+                            n: { label: "N (68.5mm)", backH: 51 },
+                            m: { label: "M (91mm) - (Możliwa Wewn.)", backH: 84 },
+                            k: { label: "K (129mm) - (Możliwa Wewn.)", backH: 116 },
+                            e: { label: "E (192mm) - (Możliwa Wewn.)", backH: 167 }
+                        },
+                        redBottomW: 51,
+                        redBottomL: 26,
+                        redBackW: 51
+                    }
+                }
+            },
+            sevroll: {
+                name: "Sevroll",
+                models: {
+                    slimbox: {
+                        name: "Sevrollbox Slim 3D",
+                        heights: {
+                            low: { label: "Niska (84mm) - (Możliwa Wewn.)", backH: 84 },
+                            med: { label: "Średnia (116mm) - (Możliwa Wewn.)", backH: 116 },
+                            high: { label: "Wysoka (167mm) - (Możliwa Wewn.)", backH: 167 },
+                            vhigh: { label: "Bardzo Wysoka (199mm) - (Możliwa Wewn.)", backH: 199 }
+                        },
+                        redBottomW: 75,
+                        redBottomL: 10,
+                        redBackW: 87
+                    }
+                }
+            },
+            gtv: {
+                name: "GTV",
+                models: {
+                    axisPro: {
+                        name: "Axis Pro",
+                        heights: {
+                            a: { label: "A (H=86mm) - (Możliwa Wewn.)", backH: 86 },
+                            b: { label: "B (H=120mm) - (Możliwa Wewn.)", backH: 120 },
+                            c: { label: "C (H=168mm) - (Możliwa Wewn.)", backH: 168 },
+                            d: { label: "D (H=200mm) - (Możliwa Wewn.)", backH: 200 }
+                        },
+                        redBottomW: 75,
+                        redBottomL: 24,
+                        redBackW: 87
+                    }
+                }
+            }
+        };
+
+        // --- LOGIKA SZUFLAD ---
+        let dData = {};
+
+        function toggleDDetails() {
+            const el = document.getElementById('d-advanced');
+            const arr = document.getElementById('d-arrow');
+            el.classList.toggle('hidden');
+            el.classList.toggle('grid');
+            arr.style.transform = el.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        // Inicjalizacja Dropdownów
+        function initDrawerSelects() {
+            const brandSel = document.getElementById('d-brand');
+            const modelSel = document.getElementById('d-model');
+            const heightSel = document.getElementById('d-height');
+            
+            // Wypełnij Marki
+            brandSel.innerHTML = Object.keys(drawerSystems).map(k => `<option value="${k}">${drawerSystems[k].name}</option>`).join('');
+            
+            brandSel.addEventListener('change', updateModels);
+            modelSel.addEventListener('change', updateHeights);
+            heightSel.addEventListener('change', applySystemSettings);
+            
+            updateModels(); // Start
+        }
+
+        function updateModels() {
+            const brandKey = document.getElementById('d-brand').value;
+            const modelSel = document.getElementById('d-model');
+            const models = drawerSystems[brandKey].models;
+            
+            modelSel.innerHTML = Object.keys(models).map(k => `<option value="${k}">${models[k].name}</option>`).join('');
+            updateHeights();
+        }
+
+        function updateHeights() {
+            const brandKey = document.getElementById('d-brand').value;
+            const modelKey = document.getElementById('d-model').value;
+            const heightSel = document.getElementById('d-height');
+            
+            const heights = drawerSystems[brandKey].models[modelKey].heights;
+            heightSel.innerHTML = Object.keys(heights).map(k => `<option value="${k}">${heights[k].label}</option>`).join('');
+            
+            applySystemSettings();
+        }
+
+        function applySystemSettings() {
+            const brandKey = document.getElementById('d-brand').value;
+            const modelKey = document.getElementById('d-model').value;
+            const heightKey = document.getElementById('d-height').value;
+            
+            const sys = drawerSystems[brandKey].models[modelKey];
+            const hData = sys.heights[heightKey];
+            
+            document.getElementById('d-red-w').value = sys.redBottomW;
+            document.getElementById('d-red-l').value = sys.redBottomL;
+            document.getElementById('d-red-back-w').value = sys.redBackW;
+            document.getElementById('d-back-h').value = hData.backH;
+            
+            calcDrawers();
+        }
+
+        function calcDrawers() {
+            // Dane wejściowe
+            const KB = parseFloat(document.getElementById('d-kb').value) || 0;
+            const T = parseFloat(document.getElementById('d-board-thick').value) || 0;
+            const NL = parseFloat(document.getElementById('d-nl').value) || 0;
+            
+            // Obliczenie LW
+            const LW = KB - (2 * T);
+            document.getElementById('d-lw-display').innerText = (LW > 0 ? LW : 0) + ' mm';
+
+            // Parametry korekty
+            const redW = parseFloat(document.getElementById('d-red-w').value) || 0;
+            const redL = parseFloat(document.getElementById('d-red-l').value) || 0;
+            const redBackW = parseFloat(document.getElementById('d-red-back-w').value) || 0;
+            const backH = parseFloat(document.getElementById('d-back-h').value) || 0;
+
+            // Wyniki
+            const botW = LW - redW;
+            const botD = NL - redL;
+            const backW = LW - redBackW;
+            
+            document.getElementById('res-d-bot-w').innerText = Math.round(botW);
+            document.getElementById('res-d-bot-d').innerText = Math.round(botD);
+            document.getElementById('res-d-back-w').innerText = Math.round(backW);
+            document.getElementById('res-d-back-h').innerText = Math.round(backH);
+
+            dData = {
+                kb: KB, lw: LW, nl: NL,
+                botW: Math.round(botW), botD: Math.round(botD),
+                backW: Math.round(backW), backH: Math.round(backH),
+                brand: document.getElementById('d-brand').options[document.getElementById('d-brand').selectedIndex].text,
+                model: document.getElementById('d-model').options[document.getElementById('d-model').selectedIndex].text
+            };
+        }
+
+        // --- POZOSTAŁA LOGIKA (Fronts, Pricing, Common) ---
         let fMode = 'equal';
         let fData = { fronts: [], carcass: [], w:0, h:0, d:0 };
-
+        
         function toggleFDetails() {
             const el = document.getElementById('f-details');
             const arr = document.getElementById('f-arrow');
@@ -348,7 +832,6 @@
             const vC = document.getElementById('res-carcass');
             const bF = document.getElementById('tab-f-fronts');
             const bC = document.getElementById('tab-f-carcass');
-            
             if(tab === 'fronts') {
                 vF.classList.remove('hidden'); vC.classList.add('hidden');
                 bF.className = "flex-1 py-2 rounded-lg text-xs font-bold shadow-sm bg-white text-slate-800 transition-all";
@@ -405,7 +888,6 @@
             const loc = document.querySelector('input[name="f-loc"]:checked').value;
             const ratioVal = document.getElementById('f-ratio').value;
 
-            // Logika frontów
             let gapLeft = loc === 'starting' ? 2 : 1;
             let gapRight = 1;
             const finalW = Math.round(W - (gapLeft + gapRight));
@@ -435,9 +917,8 @@
             }
             const roundedH = heights.map(h => Math.round(h));
             document.getElementById('f-total-h').innerText = roundedH.reduce((a,b)=>a+b,0) + ' mm';
-            document.getElementById('f-total-gaps').innerText = gapsH + ' mm'; // UPDATE Suma szczelin
+            document.getElementById('f-total-gaps').innerText = gapsH + ' mm';
 
-            // Render
             renderGap(diag, 4);
             roundedH.forEach((h, i) => {
                 listF.innerHTML += `
@@ -445,7 +926,6 @@
                         <span class="text-[10px] font-bold text-slate-400 uppercase">F${i+1}</span>
                         <span class="font-mono font-bold text-slate-800">${finalW} x ${h}</span>
                     </div>`;
-                
                 const row = document.createElement('div');
                 row.className = "w-full flex relative";
                 row.style.flexGrow = h; row.style.minHeight = "15px";
@@ -457,13 +937,11 @@
             });
             renderGap(diag, 2);
 
-            // Korpus
             const carcassData = [
                 { name: 'Bok', qty: 2, dim1: H, dim2: D },
                 { name: 'Dno', qty: 1, dim1: W-(2*THICK), dim2: D }
             ];
             if(TRAV_QTY > 0) carcassData.push({ name: 'Trawers', qty: TRAV_QTY, dim1: W-(2*THICK), dim2: TRAV_D });
-
             const listC = document.getElementById('list-carcass');
             listC.innerHTML = '';
             carcassData.forEach(el => {
@@ -478,13 +956,10 @@
                         </div>
                     </div>`;
             });
-
             fData = { w: finalW, h: H, fronts: roundedH, carcass: carcassData };
         }
 
-        // --- LOGIKA WYCENY ---
         let pData = {};
-
         function togglePDetails() {
             const el = document.getElementById('p-extra');
             const arr = document.getElementById('p-arrow');
@@ -498,18 +973,14 @@
             const other = parseFloat(document.getElementById('p-other').value) || 0;
             const exclude = document.getElementById('p-exclude').checked;
             const mult = parseFloat(document.getElementById('p-mult').value) || 0;
-
             const totalMat = mat + hard + other;
             let base = mat + hard;
             if(!exclude) base += other;
-
             const labor = base * mult;
             const total = totalMat + labor;
-
             document.getElementById('p-total-cost').innerText = formatPLN(totalMat);
             document.getElementById('p-total-labor').innerText = formatPLN(labor);
             document.getElementById('p-final-price').innerText = formatPLN(total);
-
             if(total > 0) {
                 const pMat = (totalMat/total)*100;
                 const pLab = (labor/total)*100;
@@ -519,11 +990,9 @@
                 document.getElementById('bar-mat').style.width = `0%`;
                 document.getElementById('bar-lab').style.width = `0%`;
             }
-
             pData = { mat: totalMat, labor: labor, total: total, mult: mult };
         }
 
-        // --- POMOCNICZE ---
         function renderGap(parent, size) {
             const el = document.createElement('div');
             el.className = "w-full hatch-pattern border-y border-red-300/30 flex items-center justify-center shrink-0 bg-red-50";
@@ -545,13 +1014,25 @@
                 fData.fronts.forEach((h,i)=> txt += `${i+1}. ${fData.w} x ${h}\n`);
                 txt += `\nKORPUS (Płyta: ${document.getElementById('f-thick').value}mm):\n`;
                 fData.carcass.forEach(el => txt += `${el.qty}x ${el.name}: ${Math.round(el.dim1)} x ${Math.round(el.dim2)}\n`);
-            } else {
+            } else if (currentView === 'drawers') {
+                 txt += `[SZUFLADY: ${dData.brand} ${dData.model}]\n`;
+                 txt += `Korpus KB: ${dData.kb} mm | LW: ${dData.lw} mm\n`;
+                 txt += `Prowadnica NL: ${dData.nl} mm\n\n`;
+                 txt += `FORMATKI:\n`;
+                 txt += `1x Dno: ${dData.botW} x ${dData.botD} mm\n`;
+                 txt += `1x Tył: ${dData.backW} x ${dData.backH} mm\n`;
+            } else if (currentView === 'pricing') {
                 if(!pData.total) return;
                 txt += `[WYCENA]\n`;
                 txt += `Materiały: ${formatPLN(pData.mat)}\n`;
                 txt += `Robocizna (Mnożnik x${pData.mult}): ${formatPLN(pData.labor)}\n`;
                 txt += `----------------------------\n`;
                 txt += `RAZEM: ${formatPLN(pData.total)}\n`;
+            } else {
+                 txt += `[ASYSTENT AI]\n`;
+                 // Simple export of current chat history text
+                 const chat = document.getElementById('chat-history').innerText;
+                 txt += chat;
             }
 
             const blob = new Blob([txt], {type: 'text/plain'});
@@ -563,8 +1044,7 @@
             document.body.removeChild(a);
         }
 
-        // LISTENERY
-        // Fronts
+        // LISTENERS
         ['f-width','f-height','f-depth','f-count','f-ratio','f-thick','f-trav-qty','f-trav-depth'].forEach(id => 
             document.getElementById(id).addEventListener('input', () => {
                 if(id==='f-count' && fMode==='ratio') updateFPresets();
@@ -573,17 +1053,25 @@
         );
         document.querySelectorAll('input[name="f-loc"]').forEach(r => r.addEventListener('change', calcFronts));
         
-        // Pricing
         ['p-boards','p-hardware','p-other','p-mult'].forEach(id => 
             document.getElementById(id).addEventListener('input', calcPricing)
         );
         document.getElementById('p-exclude').addEventListener('change', calcPricing);
+        
+        // Drawer Listeners
+        ['d-kb', 'd-board-thick', 'd-nl', 'd-mat-thick', 'd-red-w', 'd-red-l', 'd-red-back-w', 'd-back-h'].forEach(id => 
+            document.getElementById(id).addEventListener('input', calcDrawers)
+        );
+
+        // Chat Enter Key
+        document.getElementById('chat-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendChatMessage();
+        });
 
         // Init
+        initDrawerSelects();
         calcFronts();
         calcPricing();
     </script>
 </body>
 </html>
-
-
