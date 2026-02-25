@@ -1,4 +1,3 @@
-// ZAWartość src/App.jsx
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -11,7 +10,7 @@ import {
   Package, Image as ImageIcon, ExternalLink
 } from 'lucide-react';
 
-// TUTAJ WKLEJ SWOJĄ KONFIGURACJĘ FIREBASE (Z Etapu 1, punkt 5)
+// TWOJA KONFIGURACJA FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyB8ajuravVycMlmMNTlYfSIKfibh6LQEiQ",
   authDomain: "wyceny-4a7af.firebaseapp.com",
@@ -115,7 +114,7 @@ const App = () => {
   // --- EFEKTY (FIREBASE & URL) ---
   useEffect(() => {
     // Autoryzacja Anonimowa działa w tle
-    signInAnonymously(auth).catch(console.error);
+    signInAnonymously(auth).catch((err) => console.error("Błąd logowania anonimowego:", err));
     return onAuthStateChanged(auth, setUser);
   }, []);
 
@@ -254,13 +253,19 @@ const App = () => {
   };
 
   const saveProjectToCloud = async (overwrite = false) => {
-    if (!user) return;
+    if (!user) {
+      alert("Błąd zapisu! Brak połączenia z bazą (autoryzacja nieudana).");
+      return;
+    }
     try {
       const data = { name: currentProjectName, items: quoteItems, hardware: hardwareItems, materials: projectMaterials, wholesale: wholesaleExtraCost, services: extraServices, settings: baseSettings, globalCalcMaterials, globalFrontType, updatedAt: serverTimestamp() };
       if (overwrite && currentProjectId) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'projects', currentProjectId), data);
       else setCurrentProjectId((await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'projects'), data)).id);
       setShowSaveModal(false);
-    } catch (e) { console.error("Błąd zapisu projektu:", e); }
+    } catch (e) { 
+      console.error("Błąd zapisu projektu:", e); 
+      alert("Wystąpił błąd podczas zapisywania projektu.");
+    }
   };
 
   const loadProject = (p) => {
@@ -541,7 +546,7 @@ const App = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#F4F1EA] text-stone-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F4F1EA] text-stone-900 flex flex-col font-sans relative">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Poiret+One&display=swap');`}</style>
       
       {/* --- NAWIGACJA GŁÓWNA --- */}
@@ -562,7 +567,7 @@ const App = () => {
         </div>
       </nav>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full p-4 relative">
+      <main className="flex-1 max-w-5xl mx-auto w-full p-4 relative z-10">
         
         {/* --- 1. ZAKŁADKA WYCENY --- */}
         {activeTab === 'summary' && (
@@ -580,7 +585,15 @@ const App = () => {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => requestConfirm("Nowa wycena", "Obecny niezapisany postęp zostanie utracony. Kontynuować?", () => { setQuoteItems([]); setHardwareItems([]); setProjectMaterials([]); setCurrentProjectId(null); setCurrentProjectName('Nowa wycena'); })} className="bg-white p-2.5 border border-stone-200 rounded-xl shadow-sm hover:bg-stone-50 transition-colors" title="Rozpocznij nową wycenę"><FilePlus size={18} className="text-stone-600" /></button>
-                <button onClick={() => setShowSaveModal(true)} className="bg-stone-200 text-stone-900 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-stone-300 transition-colors shadow-sm">Zapisz</button>
+                
+                {/* TO JEST PRZYCISK ZAPISZ, KTÓRY AKTYWUJE MODAL */}
+                <button 
+                  onClick={() => setShowSaveModal(true)} 
+                  className="bg-white border-2 border-stone-800 text-stone-800 px-5 py-2.5 rounded-xl font-bold text-sm flex gap-2 items-center hover:bg-stone-50 transition-colors shadow-sm"
+                >
+                  <Save size={18}/> Zapisz
+                </button>
+
                 <button onClick={() => { resetBuilder(); setActiveTab('builder'); }} className="bg-stone-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex gap-2 items-center shadow-md hover:bg-stone-900 transition-colors"><Plus size={18}/> Dodaj Mebel / Element</button>
               </div>
             </div>
@@ -1195,258 +1208,260 @@ const App = () => {
           </div>
         )}
 
-        {/* --- MODAL WYSKAKUJĄCY: KREATOR MEBLI --- */}
-        {activeTab === 'builder' && (
-          <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-[40px] p-8 sm:p-10 w-full max-w-lg shadow-2xl relative animate-in zoom-in-95 border border-stone-100 max-h-[90vh] overflow-y-auto">
-               <button onClick={() => { setActiveTab('summary'); resetBuilder(); }} className="absolute top-6 right-6 text-stone-400 bg-stone-50 p-2.5 rounded-full hover:bg-stone-200 transition-colors"><X size={20}/></button>
-               
-               {/* Krok 1 */}
-               {builderStep === 1 && (
-                 <div className="space-y-4 text-center mt-2">
-                   <h2 className="text-2xl font-black mb-6 tracking-tight text-stone-800">Co chcesz dodać?</h2>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'hanging', heightType: '720', depthType: '300'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowUpToLine size={24}/></div> Szafka Wisząca</button>
-                     <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'standing', heightType: '720', depthType: '510'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowDownToLine size={24}/></div> Szafka Stojąca</button>
-                     <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'blat', widthType: '2000', depthType: '600', thickness: '38'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-amber-600 hover:bg-amber-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Ruler size={24}/></div> Blat Roboczy</button>
-                     <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'formatka', widthType: '600', heightType: '720', isEdged: true, boardMaterial: 'korpus'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-orange-600 hover:bg-orange-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Layers size={24}/></div> Poj. Formatka</button>
-                   </div>
-                 </div>
-               )}
-
-               {/* Krok 2 */}
-               {builderStep === 2 && (
-                 <div className="space-y-6 text-center mt-2">
-                   <h2 className="text-2xl font-black mb-2 tracking-tight text-stone-800">Nazwij ten moduł / element</h2>
-                   <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-8">Ułatwi to identyfikację na liście</p>
-                   <input autoFocus className="w-full p-6 bg-stone-50 rounded-[24px] font-black text-center text-2xl text-stone-800 outline-none uppercase tracking-wider" placeholder={currentFurniture.category === 'blat' ? 'np. Blat Kuchenny' : currentFurniture.category === 'formatka' ? 'np. Bok Szafki' : 'np. Szafka Zlew'} value={currentFurniture.name} onChange={e => setCurrentFurniture({...currentFurniture, name: e.target.value})}/>
-                 </div>
-               )}
-
-               {/* Krok 3 */}
-               {builderStep === 3 && (
-                 <div className="space-y-4 mt-2">
-                   <h2 className="text-2xl font-black text-center mb-6 uppercase text-stone-800">
-                     {currentFurniture.category === 'blat' ? 'Wymiary Blatu' : currentFurniture.category === 'formatka' ? 'Wymiary Formatki' : 'Gabaryty bryły'}
-                   </h2>
-                   
-                   {/* Szerokość / Długość */}
-                   <div className="bg-stone-50 p-4 rounded-2xl">
-                     <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">
-                       {currentFurniture.category === 'blat' ? 'Długość blatu (mm)' : currentFurniture.category === 'formatka' ? 'Szerokość formatki (mm)' : 'Szerokość (mm)'}
-                     </p>
-                     <div className="flex gap-2">
-                       <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.widthType} onChange={e=>setCurrentFurniture({...currentFurniture, widthType: e.target.value})}>
-                         <option value="450">450 mm</option>
-                         <option value="600">600 mm</option>
-                         <option value="800">800 mm</option>
-                         <option value="900">900 mm</option>
-                         {currentFurniture.category === 'blat' && <option value="2000">2000 mm</option>}
-                         {currentFurniture.category === 'blat' && <option value="4100">4100 mm</option>}
-                         <option value="custom">WŁASNY</option>
-                       </select>
-                       {currentFurniture.widthType === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customWidth} onChange={e=>setCurrentFurniture({...currentFurniture, customWidth: e.target.value})}/>}
-                     </div>
-                   </div>
-
-                   {/* Wysokość (oprócz blatu) */}
-                   {currentFurniture.category !== 'blat' && (
-                     <div className="bg-stone-50 p-4 rounded-2xl">
-                       <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">
-                         {currentFurniture.category === 'formatka' ? 'Wysokość formatki (mm)' : 'Wysokość korpusu (mm)'}
-                       </p>
-                       <div className="flex gap-2">
-                         <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.heightType} onChange={e=>setCurrentFurniture({...currentFurniture, heightType: e.target.value})}>
-                           <option value="360">360 mm</option>
-                           <option value="720">720 mm</option>
-                           <option value="820">820 mm</option>
-                           <option value="2100">2100 mm</option>
-                           <option value="custom">WŁASNY</option>
-                         </select>
-                         {currentFurniture.heightType === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customHeight} onChange={e=>setCurrentFurniture({...currentFurniture, customHeight: e.target.value})}/>}
-                       </div>
-                     </div>
-                   )}
-
-                   {/* Głębokość (oprócz formatki) */}
-                   {currentFurniture.category !== 'formatka' && (
-                     <div className="bg-stone-50 p-4 rounded-2xl">
-                       <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">
-                         {currentFurniture.category === 'blat' ? 'Głębokość blatu (mm)' : 'Głębokość całkowita (mm)'}
-                       </p>
-                       <div className="flex gap-2">
-                         <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.depthType} onChange={e=>setCurrentFurniture({...currentFurniture, depthType: e.target.value})}>
-                           <option value="300">300 mm</option>
-                           <option value="510">510 mm</option>
-                           <option value="560">560 mm</option>
-                           {currentFurniture.category === 'blat' && <option value="600">600 mm</option>}
-                           {currentFurniture.category === 'blat' && <option value="650">650 mm</option>}
-                           <option value="custom">WŁASNY</option>
-                         </select>
-                         {currentFurniture.depthType === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customDepth} onChange={e=>setCurrentFurniture({...currentFurniture, customDepth: e.target.value})}/>}
-                       </div>
-                     </div>
-                   )}
-
-                   {/* Grubość (Tylko blat) */}
-                   {currentFurniture.category === 'blat' && (
-                     <div className="bg-stone-50 p-4 rounded-2xl">
-                       <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">Grubość blatu (mm)</p>
-                       <div className="flex gap-2">
-                         <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.thickness} onChange={e=>setCurrentFurniture({...currentFurniture, thickness: e.target.value})}>
-                           <option value="28">28 mm</option>
-                           <option value="38">38 mm</option>
-                           <option value="custom">WŁASNY</option>
-                         </select>
-                         {currentFurniture.thickness === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customThickness} onChange={e=>setCurrentFurniture({...currentFurniture, customThickness: e.target.value})}/>}
-                       </div>
-                     </div>
-                   )}
-                 </div>
-               )}
-
-               {/* Krok 4 (Dla szafek i formatki) */}
-               {builderStep === 4 && ['hanging', 'standing'].includes(currentFurniture.category) && (
-                 <div className="space-y-4 text-center mt-2">
-                   <h2 className="text-2xl font-black mb-8 uppercase text-stone-800">Złożoność Konstrukcji</h2>
-                   <button onClick={() => setCurrentFurniture({...currentFurniture, type: 'prosty'})} className={`w-full p-5 border-2 rounded-2xl font-black uppercase text-sm transition-all ${currentFurniture.type === 'prosty' ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-500'}`}>Moduł Standardowy</button>
-                   <button onClick={() => setCurrentFurniture({...currentFurniture, type: 'skomplikowany'})} className={`w-full p-5 border-2 rounded-2xl font-black uppercase text-sm transition-all ${currentFurniture.type === 'skomplikowany' ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-500'}`}>Złożony / Narożny</button>
-                   {currentFurniture.category === 'standing' && (<button onClick={() => setCurrentFurniture({...currentFurniture, type: 'szuflady'})} className={`w-full p-5 border-2 rounded-2xl font-black uppercase text-sm transition-all ${currentFurniture.type === 'szuflady' ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-500'}`}>Z Szufladami</button>)}
-                   {currentFurniture.type === 'szuflady' && (
-                     <div className="mt-8 p-5 bg-stone-100 border border-stone-200 rounded-2xl">
-                       <p className="text-[10px] font-black uppercase text-stone-800 mb-4">Liczba szuflad</p>
-                       <div className="flex gap-3 justify-center">{[1,2,3,4,5].map(n => (<button key={n} onClick={()=>setCurrentFurniture({...currentFurniture, drawerCount: n, frontCount: n})} className={`w-12 h-12 rounded-xl font-black text-xl transition-all ${currentFurniture.drawerCount === n ? 'bg-stone-800 text-white' : 'bg-white text-stone-400 border border-stone-200'}`}>{n}</button>))}</div>
-                     </div>
-                   )}
-                 </div>
-               )}
-
-               {/* Krok 4 Opcje formatki */}
-               {builderStep === 4 && currentFurniture.category === 'formatka' && (
-                 <div className="space-y-6 text-center mt-2">
-                    <h2 className="text-2xl font-black mb-8 uppercase text-stone-800">Opcje Formatki</h2>
-
-                    <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4">Materiał Płyty</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => setCurrentFurniture({...currentFurniture, boardMaterial: 'korpus'})} className={`p-4 rounded-xl font-black text-xs uppercase transition-all ${currentFurniture.boardMaterial === 'korpus' ? 'bg-stone-800 text-white shadow-md' : 'bg-white text-stone-500 border border-stone-200'}`}>Płyta Korpusowa</button>
-                        <button onClick={() => setCurrentFurniture({...currentFurniture, boardMaterial: 'front'})} className={`p-4 rounded-xl font-black text-xs uppercase transition-all ${currentFurniture.boardMaterial === 'front' ? 'bg-stone-800 text-white shadow-md' : 'bg-white text-stone-500 border border-stone-200'}`}>Płyta Frontowa</button>
-                      </div>
-                    </div>
-
-                    <label className={`flex items-center justify-between p-6 rounded-2xl cursor-pointer border-2 transition-all ${currentFurniture.isEdged ? 'bg-green-50 border-green-200' : 'bg-stone-50 border-stone-200'}`}>
-                      <span className={`font-black uppercase tracking-widest text-sm ${currentFurniture.isEdged ? 'text-green-800' : 'text-stone-500'}`}>Oklejanie krawędzi (dokooła)</span>
-                      <div className={`w-14 h-8 rounded-full relative transition-colors ${currentFurniture.isEdged ? 'bg-green-500' : 'bg-stone-300'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${currentFurniture.isEdged ? 'left-7' : 'left-1'}`}></div></div>
-                      <input type="checkbox" className="hidden" checked={currentFurniture.isEdged} onChange={e => setCurrentFurniture({...currentFurniture, isEdged: e.target.checked})} />
-                    </label>
-                 </div>
-               )}
-
-               {/* Krok 5 (Tylko dla szafek) */}
-               {builderStep === 5 && (
-                 <div className="space-y-6 text-center mt-2">
-                   <h2 className="text-2xl font-black mb-8 uppercase text-stone-800">Zamknięcie Mebla</h2>
-                   <label className={`flex items-center justify-between p-6 rounded-2xl cursor-pointer border-2 transition-all ${currentFurniture.hasFronts ? 'bg-green-50 border-green-200' : 'bg-stone-50 border-stone-200'}`}>
-                     <span className={`font-black uppercase tracking-widest text-sm ${currentFurniture.hasFronts ? 'text-green-800' : 'text-stone-500'}`}>Zamykany frontem?</span>
-                     <div className={`w-14 h-8 rounded-full relative transition-colors ${currentFurniture.hasFronts ? 'bg-green-500' : 'bg-stone-300'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${currentFurniture.hasFronts ? 'left-7' : 'left-1'}`}></div></div>
-                     <input type="checkbox" className="hidden" checked={currentFurniture.hasFronts} onChange={e => setCurrentFurniture({...currentFurniture, hasFronts: e.target.checked})} />
-                   </label>
-                   {currentFurniture.hasFronts && (
-                     <div className="mt-8 p-6 bg-white border-2 border-stone-100 rounded-2xl">
-                       <p className="text-[10px] font-black uppercase text-stone-400 mb-4">Ilość sztuk frontów?</p>
-                       <div className="flex justify-center gap-3 flex-wrap">{[1,2,3,4].map(n => (<button key={n} onClick={()=>setCurrentFurniture({...currentFurniture, frontCount: n})} className={`w-16 h-16 rounded-2xl font-black text-2xl transition-all ${currentFurniture.frontCount === n ? 'bg-stone-800 text-white' : 'bg-stone-50 text-stone-400 border border-stone-200'}`}>{n}</button>))}</div>
-                     </div>
-                   )}
-                 </div>
-               )}
-
-               <div className="flex gap-4 mt-10 pt-6 border-t border-stone-100">
-                 {builderStep > 1 && (<button onClick={() => setBuilderStep(builderStep - 1)} className="flex-1 py-4 border-2 border-stone-200 bg-white rounded-xl font-black text-stone-500 text-xs uppercase tracking-widest hover:bg-stone-50">Cofnij</button>)}
-                 <button 
-                   disabled={builderStep === 2 && !currentFurniture.name} 
-                   onClick={() => {
-                     const isReadyToSubmit = (currentFurniture.category === 'blat' && builderStep === 3) || (currentFurniture.category === 'formatka' && builderStep === 4) || (builderStep === 5);
-                     if (isReadyToSubmit) handleAddToQuote();
-                     else setBuilderStep(builderStep + 1);
-                   }} 
-                   className="flex-[2] py-4 bg-stone-800 text-white rounded-xl font-black text-sm uppercase tracking-widest disabled:opacity-50 hover:bg-stone-900 transition-colors"
-                 >
-                   {((currentFurniture.category === 'blat' && builderStep === 3) || (currentFurniture.category === 'formatka' && builderStep === 4) || (builderStep === 5)) ? (editingId ? 'Zapisz Zmiany' : 'Gotowe') : 'Dalej'}
-                 </button>
-               </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- MODAL WYSKAKUJĄCY: BAZA GLOBALNA (OKUCIA) --- */}
-        {showAddGlobalModal && (
-          <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-            <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-stone-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
-              <h3 className="font-black text-xl mb-6 uppercase tracking-tight text-center text-stone-800 flex flex-col items-center gap-3">
-                <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Wrench size={24}/></div> Dodaj Nowe Okucie
-              </h3>
-              
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Kategoria</label>
-              <select className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={newGlobalHardware.category} onChange={e=>setNewGlobalHardware({...newGlobalHardware, category: e.target.value})}>
-                {['Szuflady', 'Zawiasy', 'Uchwyty', 'Oświetlenie', 'Systemy Przesuwne', 'Inne'].map(c=><option key={c}>{c}</option>)}
-              </select>
-              
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Nazwa modelu (np. Blum Tandembox)</label>
-              <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wpisz nazwę okucia..." value={newGlobalHardware.name} onChange={e=>setNewGlobalHardware({...newGlobalHardware, name: e.target.value})} />
-              
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do zdjęcia (Opcjonalnie) <ImageIcon size={12}/></label>
-              <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wklej URL zdjęcia..." value={newGlobalHardware.imageUrl} onChange={e=>setNewGlobalHardware({...newGlobalHardware, imageUrl: e.target.value})} />
-
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do produktu (Opcjonalnie) <ExternalLink size={12}/></label>
-              <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="https://sklep..." value={newGlobalHardware.linkUrl} onChange={e=>setNewGlobalHardware({...newGlobalHardware, linkUrl: e.target.value})} />
-              
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Cena zakupu netto za szt/kpl</label>
-              <div className="relative mb-6">
-                <input type="number" className="w-full p-4 bg-stone-50 rounded-xl font-black text-stone-800 text-lg border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="0.00" value={newGlobalHardware.unitPrice || ''} onChange={e=>setNewGlobalHardware({...newGlobalHardware, unitPrice: Number(e.target.value)})} />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-stone-400">PLN</span>
-              </div>
-              
-              <div className="flex gap-3">
-                <button onClick={()=>setShowAddGlobalModal(false)} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
-                <button onClick={async () => { if (!user || !newGlobalHardware.name) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'hardware_db'), { ...newGlobalHardware, createdAt: serverTimestamp() }); setShowAddGlobalModal(false); setNewGlobalHardware({ name: '', category: 'Szuflady', unitPrice: 0, imageUrl: '', linkUrl: '' }); }} disabled={!newGlobalHardware.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz w Bazie</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- MODAL WYSKAKUJĄCY: BAZA GLOBALNA (MATERIAŁY) --- */}
-        {showAddMaterialModal && (
-          <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-            <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-stone-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
-              <h3 className="font-black text-xl mb-6 uppercase tracking-tight text-center text-stone-800 flex flex-col items-center gap-3">
-                <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Package size={24}/></div> Dodaj Materiał
-              </h3>
-              
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Kategoria</label>
-              <select className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={newMaterial.category} onChange={e=>setNewMaterial({...newMaterial, category: e.target.value})}>
-                {['Płyta korpusowa', 'Płyta frontowa', 'Blat', 'Inne'].map(c=><option key={c}>{c}</option>)}
-              </select>
-              
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Nazwa materiału (np. Dąb Lancelot)</label>
-              <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wpisz nazwę..." value={newMaterial.name} onChange={e=>setNewMaterial({...newMaterial, name: e.target.value})} />
-              
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do zdjęcia (Opcjonalnie) <ImageIcon size={12}/></label>
-              <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wklej URL zdjęcia..." value={newMaterial.imageUrl} onChange={e=>setNewMaterial({...newMaterial, imageUrl: e.target.value})} />
-
-              <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do produktu (Opcjonalnie) <ExternalLink size={12}/></label>
-              <input className="w-full p-4 bg-stone-50 rounded-xl mb-6 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="https://sklep..." value={newMaterial.linkUrl} onChange={e=>setNewMaterial({...newMaterial, linkUrl: e.target.value})} />
-              
-              <div className="flex gap-3">
-                <button onClick={()=>setShowAddMaterialModal(false)} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
-                <button onClick={async () => { if (!user || !newMaterial.name) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'materials_db'), { ...newMaterial, createdAt: serverTimestamp() }); setShowAddMaterialModal(false); setNewMaterial({ name: '', category: 'Płyta korpusowa', imageUrl: '', linkUrl: '' }); }} disabled={!newMaterial.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz w Bazie</button>
-              </div>
-            </div>
-          </div>
-        )}
-
       </main>
 
-      {/* --- WŁASNY MODAL POTWIERDZENIA --- */}
+      {/* --- MODALE (WYSKAKUJĄCE OKIENKA) WYCIĄGNIĘTE NA SAM DÓŁ ABY UNIKNĄĆ BLOKOWANIA PRZEZ CSS --- */}
+      
+      {/* 1. KREATOR MEBLI */}
+      {activeTab === 'builder' && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+          <div className="bg-white rounded-[40px] p-8 sm:p-10 w-full max-w-lg shadow-2xl relative animate-in zoom-in-95 border border-stone-100 max-h-[90vh] overflow-y-auto">
+             <button onClick={() => { setActiveTab('summary'); resetBuilder(); }} className="absolute top-6 right-6 text-stone-400 bg-stone-50 p-2.5 rounded-full hover:bg-stone-200 transition-colors"><X size={20}/></button>
+             
+             {/* Krok 1 */}
+             {builderStep === 1 && (
+               <div className="space-y-4 text-center mt-2">
+                 <h2 className="text-2xl font-black mb-6 tracking-tight text-stone-800">Co chcesz dodać?</h2>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'hanging', heightType: '720', depthType: '300'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowUpToLine size={24}/></div> Szafka Wisząca</button>
+                   <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'standing', heightType: '720', depthType: '510'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowDownToLine size={24}/></div> Szafka Stojąca</button>
+                   <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'blat', widthType: '2000', depthType: '600', thickness: '38'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-amber-600 hover:bg-amber-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Ruler size={24}/></div> Blat Roboczy</button>
+                   <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'formatka', widthType: '600', heightType: '720', isEdged: true, boardMaterial: 'korpus'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-orange-600 hover:bg-orange-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Layers size={24}/></div> Poj. Formatka</button>
+                 </div>
+               </div>
+             )}
+
+             {/* Krok 2 */}
+             {builderStep === 2 && (
+               <div className="space-y-6 text-center mt-2">
+                 <h2 className="text-2xl font-black mb-2 tracking-tight text-stone-800">Nazwij ten moduł / element</h2>
+                 <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-8">Ułatwi to identyfikację na liście</p>
+                 <input autoFocus className="w-full p-6 bg-stone-50 rounded-[24px] font-black text-center text-2xl text-stone-800 outline-none uppercase tracking-wider" placeholder={currentFurniture.category === 'blat' ? 'np. Blat Kuchenny' : currentFurniture.category === 'formatka' ? 'np. Bok Szafki' : 'np. Szafka Zlew'} value={currentFurniture.name} onChange={e => setCurrentFurniture({...currentFurniture, name: e.target.value})}/>
+               </div>
+             )}
+
+             {/* Krok 3 */}
+             {builderStep === 3 && (
+               <div className="space-y-4 mt-2">
+                 <h2 className="text-2xl font-black text-center mb-6 uppercase text-stone-800">
+                   {currentFurniture.category === 'blat' ? 'Wymiary Blatu' : currentFurniture.category === 'formatka' ? 'Wymiary Formatki' : 'Gabaryty bryły'}
+                 </h2>
+                 
+                 {/* Szerokość / Długość */}
+                 <div className="bg-stone-50 p-4 rounded-2xl">
+                   <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">
+                     {currentFurniture.category === 'blat' ? 'Długość blatu (mm)' : currentFurniture.category === 'formatka' ? 'Szerokość formatki (mm)' : 'Szerokość (mm)'}
+                   </p>
+                   <div className="flex gap-2">
+                     <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.widthType} onChange={e=>setCurrentFurniture({...currentFurniture, widthType: e.target.value})}>
+                       <option value="450">450 mm</option>
+                       <option value="600">600 mm</option>
+                       <option value="800">800 mm</option>
+                       <option value="900">900 mm</option>
+                       {currentFurniture.category === 'blat' && <option value="2000">2000 mm</option>}
+                       {currentFurniture.category === 'blat' && <option value="4100">4100 mm</option>}
+                       <option value="custom">WŁASNY</option>
+                     </select>
+                     {currentFurniture.widthType === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customWidth} onChange={e=>setCurrentFurniture({...currentFurniture, customWidth: e.target.value})}/>}
+                   </div>
+                 </div>
+
+                 {/* Wysokość (oprócz blatu) */}
+                 {currentFurniture.category !== 'blat' && (
+                   <div className="bg-stone-50 p-4 rounded-2xl">
+                     <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">
+                       {currentFurniture.category === 'formatka' ? 'Wysokość formatki (mm)' : 'Wysokość korpusu (mm)'}
+                     </p>
+                     <div className="flex gap-2">
+                       <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.heightType} onChange={e=>setCurrentFurniture({...currentFurniture, heightType: e.target.value})}>
+                         <option value="360">360 mm</option>
+                         <option value="720">720 mm</option>
+                         <option value="820">820 mm</option>
+                         <option value="2100">2100 mm</option>
+                         <option value="custom">WŁASNY</option>
+                       </select>
+                       {currentFurniture.heightType === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customHeight} onChange={e=>setCurrentFurniture({...currentFurniture, customHeight: e.target.value})}/>}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Głębokość (oprócz formatki) */}
+                 {currentFurniture.category !== 'formatka' && (
+                   <div className="bg-stone-50 p-4 rounded-2xl">
+                     <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">
+                       {currentFurniture.category === 'blat' ? 'Głębokość blatu (mm)' : 'Głębokość całkowita (mm)'}
+                     </p>
+                     <div className="flex gap-2">
+                       <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.depthType} onChange={e=>setCurrentFurniture({...currentFurniture, depthType: e.target.value})}>
+                         <option value="300">300 mm</option>
+                         <option value="510">510 mm</option>
+                         <option value="560">560 mm</option>
+                         {currentFurniture.category === 'blat' && <option value="600">600 mm</option>}
+                         {currentFurniture.category === 'blat' && <option value="650">650 mm</option>}
+                         <option value="custom">WŁASNY</option>
+                       </select>
+                       {currentFurniture.depthType === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customDepth} onChange={e=>setCurrentFurniture({...currentFurniture, customDepth: e.target.value})}/>}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Grubość (Tylko blat) */}
+                 {currentFurniture.category === 'blat' && (
+                   <div className="bg-stone-50 p-4 rounded-2xl">
+                     <p className="text-[10px] font-black uppercase text-stone-500 mb-3 text-center">Grubość blatu (mm)</p>
+                     <div className="flex gap-2">
+                       <select className="p-4 bg-white rounded-xl font-black text-stone-700 flex-1 outline-none" value={currentFurniture.thickness} onChange={e=>setCurrentFurniture({...currentFurniture, thickness: e.target.value})}>
+                         <option value="28">28 mm</option>
+                         <option value="38">38 mm</option>
+                         <option value="custom">WŁASNY</option>
+                       </select>
+                       {currentFurniture.thickness === 'custom' && <input type="number" className="p-4 bg-white rounded-xl font-black w-28 text-center text-stone-800 outline-none" placeholder="mm" value={currentFurniture.customThickness} onChange={e=>setCurrentFurniture({...currentFurniture, customThickness: e.target.value})}/>}
+                     </div>
+                   </div>
+                 )}
+               </div>
+             )}
+
+             {/* Krok 4 (Dla szafek i formatki) */}
+             {builderStep === 4 && ['hanging', 'standing'].includes(currentFurniture.category) && (
+               <div className="space-y-4 text-center mt-2">
+                 <h2 className="text-2xl font-black mb-8 uppercase text-stone-800">Złożoność Konstrukcji</h2>
+                 <button onClick={() => setCurrentFurniture({...currentFurniture, type: 'prosty'})} className={`w-full p-5 border-2 rounded-2xl font-black uppercase text-sm transition-all ${currentFurniture.type === 'prosty' ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-500'}`}>Moduł Standardowy</button>
+                 <button onClick={() => setCurrentFurniture({...currentFurniture, type: 'skomplikowany'})} className={`w-full p-5 border-2 rounded-2xl font-black uppercase text-sm transition-all ${currentFurniture.type === 'skomplikowany' ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-500'}`}>Złożony / Narożny</button>
+                 {currentFurniture.category === 'standing' && (<button onClick={() => setCurrentFurniture({...currentFurniture, type: 'szuflady'})} className={`w-full p-5 border-2 rounded-2xl font-black uppercase text-sm transition-all ${currentFurniture.type === 'szuflady' ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-500'}`}>Z Szufladami</button>)}
+                 {currentFurniture.type === 'szuflady' && (
+                   <div className="mt-8 p-5 bg-stone-100 border border-stone-200 rounded-2xl">
+                     <p className="text-[10px] font-black uppercase text-stone-800 mb-4">Liczba szuflad</p>
+                     <div className="flex gap-3 justify-center">{[1,2,3,4,5].map(n => (<button key={n} onClick={()=>setCurrentFurniture({...currentFurniture, drawerCount: n, frontCount: n})} className={`w-12 h-12 rounded-xl font-black text-xl transition-all ${currentFurniture.drawerCount === n ? 'bg-stone-800 text-white' : 'bg-white text-stone-400 border border-stone-200'}`}>{n}</button>))}</div>
+                   </div>
+                 )}
+               </div>
+             )}
+
+             {/* Krok 4 Opcje formatki */}
+             {builderStep === 4 && currentFurniture.category === 'formatka' && (
+               <div className="space-y-6 text-center mt-2">
+                  <h2 className="text-2xl font-black mb-8 uppercase text-stone-800">Opcje Formatki</h2>
+
+                  <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4">Materiał Płyty</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button onClick={() => setCurrentFurniture({...currentFurniture, boardMaterial: 'korpus'})} className={`p-4 rounded-xl font-black text-xs uppercase transition-all ${currentFurniture.boardMaterial === 'korpus' ? 'bg-stone-800 text-white shadow-md' : 'bg-white text-stone-500 border border-stone-200'}`}>Płyta Korpusowa</button>
+                      <button onClick={() => setCurrentFurniture({...currentFurniture, boardMaterial: 'front'})} className={`p-4 rounded-xl font-black text-xs uppercase transition-all ${currentFurniture.boardMaterial === 'front' ? 'bg-stone-800 text-white shadow-md' : 'bg-white text-stone-500 border border-stone-200'}`}>Płyta Frontowa</button>
+                    </div>
+                  </div>
+
+                  <label className={`flex items-center justify-between p-6 rounded-2xl cursor-pointer border-2 transition-all ${currentFurniture.isEdged ? 'bg-green-50 border-green-200' : 'bg-stone-50 border-stone-200'}`}>
+                    <span className={`font-black uppercase tracking-widest text-sm ${currentFurniture.isEdged ? 'text-green-800' : 'text-stone-500'}`}>Oklejanie krawędzi (dokooła)</span>
+                    <div className={`w-14 h-8 rounded-full relative transition-colors ${currentFurniture.isEdged ? 'bg-green-500' : 'bg-stone-300'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${currentFurniture.isEdged ? 'left-7' : 'left-1'}`}></div></div>
+                    <input type="checkbox" className="hidden" checked={currentFurniture.isEdged} onChange={e => setCurrentFurniture({...currentFurniture, isEdged: e.target.checked})} />
+                  </label>
+               </div>
+             )}
+
+             {/* Krok 5 (Tylko dla szafek) */}
+             {builderStep === 5 && (
+               <div className="space-y-6 text-center mt-2">
+                 <h2 className="text-2xl font-black mb-8 uppercase text-stone-800">Zamknięcie Mebla</h2>
+                 <label className={`flex items-center justify-between p-6 rounded-2xl cursor-pointer border-2 transition-all ${currentFurniture.hasFronts ? 'bg-green-50 border-green-200' : 'bg-stone-50 border-stone-200'}`}>
+                   <span className={`font-black uppercase tracking-widest text-sm ${currentFurniture.hasFronts ? 'text-green-800' : 'text-stone-500'}`}>Zamykany frontem?</span>
+                   <div className={`w-14 h-8 rounded-full relative transition-colors ${currentFurniture.hasFronts ? 'bg-green-500' : 'bg-stone-300'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${currentFurniture.hasFronts ? 'left-7' : 'left-1'}`}></div></div>
+                   <input type="checkbox" className="hidden" checked={currentFurniture.hasFronts} onChange={e => setCurrentFurniture({...currentFurniture, hasFronts: e.target.checked})} />
+                 </label>
+                 {currentFurniture.hasFronts && (
+                   <div className="mt-8 p-6 bg-white border-2 border-stone-100 rounded-2xl">
+                     <p className="text-[10px] font-black uppercase text-stone-400 mb-4">Ilość sztuk frontów?</p>
+                     <div className="flex justify-center gap-3 flex-wrap">{[1,2,3,4].map(n => (<button key={n} onClick={()=>setCurrentFurniture({...currentFurniture, frontCount: n})} className={`w-16 h-16 rounded-2xl font-black text-2xl transition-all ${currentFurniture.frontCount === n ? 'bg-stone-800 text-white' : 'bg-stone-50 text-stone-400 border border-stone-200'}`}>{n}</button>))}</div>
+                   </div>
+                 )}
+               </div>
+             )}
+
+             <div className="flex gap-4 mt-10 pt-6 border-t border-stone-100">
+               {builderStep > 1 && (<button onClick={() => setBuilderStep(builderStep - 1)} className="flex-1 py-4 border-2 border-stone-200 bg-white rounded-xl font-black text-stone-500 text-xs uppercase tracking-widest hover:bg-stone-50">Cofnij</button>)}
+               <button 
+                 disabled={builderStep === 2 && !currentFurniture.name} 
+                 onClick={() => {
+                   const isReadyToSubmit = (currentFurniture.category === 'blat' && builderStep === 3) || (currentFurniture.category === 'formatka' && builderStep === 4) || (builderStep === 5);
+                   if (isReadyToSubmit) handleAddToQuote();
+                   else setBuilderStep(builderStep + 1);
+                 }} 
+                 className="flex-[2] py-4 bg-stone-800 text-white rounded-xl font-black text-sm uppercase tracking-widest disabled:opacity-50 hover:bg-stone-900 transition-colors"
+               >
+                 {((currentFurniture.category === 'blat' && builderStep === 3) || (currentFurniture.category === 'formatka' && builderStep === 4) || (builderStep === 5)) ? (editingId ? 'Zapisz Zmiany' : 'Gotowe') : 'Dalej'}
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. DODAJ OKUCIE */}
+      {showAddGlobalModal && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+          <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-stone-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
+            <h3 className="font-black text-xl mb-6 uppercase tracking-tight text-center text-stone-800 flex flex-col items-center gap-3">
+              <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Wrench size={24}/></div> Dodaj Nowe Okucie
+            </h3>
+            
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Kategoria</label>
+            <select className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={newGlobalHardware.category} onChange={e=>setNewGlobalHardware({...newGlobalHardware, category: e.target.value})}>
+              {['Szuflady', 'Zawiasy', 'Uchwyty', 'Oświetlenie', 'Systemy Przesuwne', 'Inne'].map(c=><option key={c}>{c}</option>)}
+            </select>
+            
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Nazwa modelu (np. Blum Tandembox)</label>
+            <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wpisz nazwę okucia..." value={newGlobalHardware.name} onChange={e=>setNewGlobalHardware({...newGlobalHardware, name: e.target.value})} />
+            
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do zdjęcia (Opcjonalnie) <ImageIcon size={12}/></label>
+            <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wklej URL zdjęcia..." value={newGlobalHardware.imageUrl} onChange={e=>setNewGlobalHardware({...newGlobalHardware, imageUrl: e.target.value})} />
+
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do produktu (Opcjonalnie) <ExternalLink size={12}/></label>
+            <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="https://sklep..." value={newGlobalHardware.linkUrl} onChange={e=>setNewGlobalHardware({...newGlobalHardware, linkUrl: e.target.value})} />
+            
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Cena zakupu netto za szt/kpl</label>
+            <div className="relative mb-6">
+              <input type="number" className="w-full p-4 bg-stone-50 rounded-xl font-black text-stone-800 text-lg border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="0.00" value={newGlobalHardware.unitPrice || ''} onChange={e=>setNewGlobalHardware({...newGlobalHardware, unitPrice: Number(e.target.value)})} />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-stone-400">PLN</span>
+            </div>
+            
+            <div className="flex gap-3">
+              <button onClick={()=>setShowAddGlobalModal(false)} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
+              <button onClick={async () => { if (!user || !newGlobalHardware.name) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'hardware_db'), { ...newGlobalHardware, createdAt: serverTimestamp() }); setShowAddGlobalModal(false); setNewGlobalHardware({ name: '', category: 'Szuflady', unitPrice: 0, imageUrl: '', linkUrl: '' }); }} disabled={!newGlobalHardware.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. DODAJ MATERIAŁ */}
+      {showAddMaterialModal && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+          <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-stone-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
+            <h3 className="font-black text-xl mb-6 uppercase tracking-tight text-center text-stone-800 flex flex-col items-center gap-3">
+              <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Package size={24}/></div> Dodaj Materiał
+            </h3>
+            
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Kategoria</label>
+            <select className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={newMaterial.category} onChange={e=>setNewMaterial({...newMaterial, category: e.target.value})}>
+              {['Płyta korpusowa', 'Płyta frontowa', 'Blat', 'Inne'].map(c=><option key={c}>{c}</option>)}
+            </select>
+            
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Nazwa materiału (np. Dąb Lancelot)</label>
+            <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-sm border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wpisz nazwę..." value={newMaterial.name} onChange={e=>setNewMaterial({...newMaterial, name: e.target.value})} />
+            
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do zdjęcia (Opcjonalnie) <ImageIcon size={12}/></label>
+            <input className="w-full p-4 bg-stone-50 rounded-xl mb-4 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="Wklej URL zdjęcia..." value={newMaterial.imageUrl} onChange={e=>setNewMaterial({...newMaterial, imageUrl: e.target.value})} />
+
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block flex justify-between items-center">Link do produktu (Opcjonalnie) <ExternalLink size={12}/></label>
+            <input className="w-full p-4 bg-stone-50 rounded-xl mb-6 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="https://sklep..." value={newMaterial.linkUrl} onChange={e=>setNewMaterial({...newMaterial, linkUrl: e.target.value})} />
+            
+            <div className="flex gap-3">
+              <button onClick={()=>setShowAddMaterialModal(false)} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
+              <button onClick={async () => { if (!user || !newMaterial.name) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'materials_db'), { ...newMaterial, createdAt: serverTimestamp() }); setShowAddMaterialModal(false); setNewMaterial({ name: '', category: 'Płyta korpusowa', imageUrl: '', linkUrl: '' }); }} disabled={!newMaterial.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. MODAL POTWIERDZENIA USUWANIA */}
       {confirmDialog.isOpen && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 text-center">
@@ -1459,6 +1474,55 @@ const App = () => {
           </div>
         </div>
       )}
+
+      {/* 5. MODAL ZAPISYWANIA PROJEKTU */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+          <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 text-center border border-stone-200 relative">
+            <button onClick={() => setShowSaveModal(false)} className="absolute top-4 right-4 text-stone-400 bg-stone-50 p-2 rounded-full hover:bg-stone-200 transition-colors"><X size={16}/></button>
+
+            <h3 className="font-black text-2xl mb-6 text-stone-800 uppercase tracking-tight flex items-center justify-center gap-3">
+              <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Save size={24}/></div> Zapisz Wycenę
+            </h3>
+            
+            {/* OSTRZEŻENIE O BRAKU AUTORYZACJI */}
+            {!user && (
+              <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-[10px] font-bold uppercase tracking-widest">
+                Uwaga! Brak połączenia z bazą.
+              </div>
+            )}
+
+            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-2 block text-left">Nazwa projektu</label>
+            <input 
+              type="text" 
+              autoFocus
+              className="w-full p-4 bg-stone-50 rounded-xl mb-6 font-black text-stone-800 border-2 border-transparent outline-none focus:border-stone-200 focus:bg-white text-center text-lg transition-colors" 
+              value={currentProjectName} 
+              onChange={(e) => setCurrentProjectName(e.target.value)}
+            />
+            
+            <div className="flex flex-col gap-3">
+              {currentProjectId && (
+                <button 
+                  onClick={() => saveProjectToCloud(true)} 
+                  disabled={!user || !currentProjectName}
+                  className="w-full py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md disabled:opacity-50 hover:bg-stone-900 transition-colors"
+                >
+                  Nadpisz obecny
+                </button>
+              )}
+              <button 
+                onClick={() => saveProjectToCloud(false)} 
+                disabled={!user || !currentProjectName}
+                className={`w-full py-4 font-black rounded-xl text-xs uppercase tracking-widest disabled:opacity-50 transition-colors ${currentProjectId ? 'bg-stone-100 text-stone-600 hover:bg-stone-200' : 'bg-stone-800 text-white shadow-md hover:bg-stone-900'}`}
+              >
+                {currentProjectId ? 'Zapisz jako nowa kopia' : 'Zapisz w archiwum'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
