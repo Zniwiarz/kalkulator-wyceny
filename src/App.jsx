@@ -85,13 +85,13 @@ const App = () => {
   const [editingMaterialId, setEditingMaterialId] = useState(null);
   
   // Stany oferty i kreatora
-  const [offerConfig, setOfferConfig] = useState({ clientName: '', estimatedDelivery: '', includeWholesale: false, includeServices: true, includeHardware: true, includeMaterials: true, includeDetailedPrices: true, selectedItems: {}, countertopStandardLength: 4100 });
+  const [offerConfig, setOfferConfig] = useState({ clientName: '', estimatedDelivery: '', includeHardware: true, includeMaterials: true, includeDetailedPrices: true, selectedItems: {}, countertopStandardLength: 4100, notes: '' });
   const [builderStep, setBuilderStep] = useState(1);
   const [currentFurniture, setCurrentFurniture] = useState({ 
     category: 'hanging', name: '', type: 'prosty', drawerCount: 1, 
     widthType: '600', customWidth: '', heightType: '720', customHeight: '', 
     depthType: '300', customDepth: '', hasFronts: true, frontCount: 1,
-    thickness: '38', customThickness: '', isEdged: true, boardMaterial: 'korpus'
+    thickness: '38', customThickness: '', isEdged: true, boardMaterial: 'korpus', quantity: 1
   });
 
   // --- HELPERY WYŚWIETLANIA ---
@@ -116,7 +116,7 @@ const App = () => {
 
   const getExtraInfo = (item) => {
     if (item.category === 'blat') return '';
-    if (item.category === 'formatka') return `${item.boardMaterial === 'front' ? 'Płyta frontowa' : 'Płyta korpusowa'} • ${item.isEdged ? 'Oklejone krawędzie' : 'Surowa'}`;
+    if (item.category === 'formatka') return `${item.boardMaterial === 'front' ? 'Płyta frontowa' : 'Płyta korpusowa'} • ${item.isEdged ? 'Oklejone krawędzie' : 'Surowa'} • Ilość: ${item.quantity || 1} szt.`;
     return item.hasFronts ? `${item.frontCount} front(y)` : 'Brak frontów';
   };
 
@@ -171,6 +171,7 @@ const App = () => {
   const calculateItemMetrics = useCallback((item, settings, isGlobalMaterialCalc, frontType) => {
     let hours = settings.baseHoursPerItem || 4;
     let multiplier = 1.0;
+    const qty = item.quantity || 1; // Ilość, głównie dla formatek
     
     const mHP = settings.multHangingProsty ?? 1.2;
     const mHS = settings.multHangingSkomplik ?? 1.4;
@@ -186,7 +187,7 @@ const App = () => {
     } else if (item.category === 'blat') {
       hours = (settings.baseHoursPerItem || 4) * 0.2; 
     } else if (item.category === 'formatka') {
-      hours = (settings.baseHoursPerItem || 4) * 0.1; 
+      hours = (settings.baseHoursPerItem || 4) * 0.1 * qty; // Czas dla formatek mnożony przez ilość
     }
     
     hours *= multiplier;
@@ -203,12 +204,12 @@ const App = () => {
        if (isGlobalMaterialCalc) materialCost = Math.round(countertopMb * (settings.countertopPriceMb || 150));
     } 
     else if (item.category === 'formatka' && W && H) {
-       const area = W * H;
+       const area = W * H * qty; // Powierzchnia formatek mnożona przez ilość
        if (item.boardMaterial === 'front') frontM2 = area;
        else plateM2 = area;
 
-       if (item.isEdged) totalEdging = (W + H) * 2;
-       totalCutting = (W + H) * 2;
+       if (item.isEdged) totalEdging = (W + H) * 2 * qty; // Krawędzie mnożone przez ilość
+       totalCutting = (W + H) * 2 * qty; // Cięcie mnożone przez ilość
 
        let formatkaFrontPrice = frontType === 'mat' ? settings.frontMatPriceM2 : frontType === 'lakier' ? settings.frontLakierPriceM2 : frontType === 'ryflowany' ? settings.frontRyflowanyPriceM2 : settings.frontStandardPriceM2;
 
@@ -260,11 +261,11 @@ const App = () => {
   }, [calculatedQuoteItems, hardwareTotalSum, servicesTotalSum, extraServices, wholesaleExtraCost, baseSettings]);
 
   const offerItems = useMemo(() => calculatedQuoteItems.filter(item => offerConfig.selectedItems[item.id]), [calculatedQuoteItems, offerConfig.selectedItems]);
-  const rawOfferTotal = offerItems.reduce((acc, item) => acc + item.totalPrice, 0) + (offerConfig.includeServices ? servicesTotalSum : 0) + (offerConfig.includeWholesale ? Number(wholesaleExtraCost || 0) : 0) + (offerConfig.includeHardware ? hardwareTotalSum : 0);
+  const rawOfferTotal = offerItems.reduce((acc, item) => acc + item.totalPrice, 0) + servicesTotalSum + Number(wholesaleExtraCost || 0) + (offerConfig.includeHardware ? hardwareTotalSum : 0);
   const offerTotal = Math.ceil(rawOfferTotal / 10) * 10;
 
   // --- AKCJE I FUNKCJE ---
-  const resetBuilder = () => { setCurrentFurniture({ category: 'hanging', name: '', type: 'prosty', drawerCount: 1, widthType: '600', customWidth: '', heightType: '720', customHeight: '', depthType: '300', customDepth: '', hasFronts: true, frontCount: 1, thickness: '38', customThickness: '', isEdged: true, boardMaterial: 'korpus' }); setBuilderStep(1); setEditingId(null); };
+  const resetBuilder = () => { setCurrentFurniture({ category: 'hanging', name: '', type: 'prosty', drawerCount: 1, widthType: '600', customWidth: '', heightType: '720', customHeight: '', depthType: '300', customDepth: '', hasFronts: true, frontCount: 1, thickness: '38', customThickness: '', isEdged: true, boardMaterial: 'korpus', quantity: 1 }); setBuilderStep(1); setEditingId(null); };
 
   const handleAddToQuote = () => {
     const newItem = { ...currentFurniture, id: editingId || Date.now() };
@@ -327,19 +328,20 @@ const App = () => {
         items: offerItems.map(i => ({ 
           name: i.name, category: i.category, widthType: i.widthType, customWidth: i.customWidth, 
           heightType: i.heightType, customHeight: i.customHeight, depthType: i.depthType, customDepth: i.customDepth, 
-          thickness: i.thickness, customThickness: i.customThickness,
+          thickness: i.thickness, customThickness: i.customThickness, quantity: i.quantity || 1,
           totalPrice: i.totalPrice, raw: i.raw
         })),
         hardware: offerConfig.includeHardware ? hardwareItems.map(h => ({ name: h.name, category: h.category, quantity: h.quantity, unitPrice: h.unitPrice, imageUrl: h.imageUrl || '', linkUrl: h.linkUrl || '' })) : [],
         materials: offerConfig.includeMaterials ? projectMaterials.map(m => ({ name: m.name, category: m.category, imageUrl: m.imageUrl || '', linkUrl: m.linkUrl || '' })) : [],
         includeHardware: offerConfig.includeHardware,
-        includeServices: offerConfig.includeServices,
         includeMaterials: offerConfig.includeMaterials,
         includeDetailedPrices: offerConfig.includeDetailedPrices,
         servicesTotal: servicesTotalSum,
+        wholesaleTotal: wholesaleExtraCost,
         hardwareTotal: hardwareTotalSum,
         furnitureTotal: offerItems.reduce((acc, item) => acc + item.totalPrice, 0),
         offerTotal: offerTotal,
+        notes: offerConfig.notes || '',
         dateStr: new Date().toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' }),
         createdAt: serverTimestamp()
       };
@@ -428,7 +430,7 @@ const App = () => {
       );
     }
 
-    const { projectName, clientName, estimatedDelivery, items, hardware, materials, includeHardware, includeServices, includeMaterials, includeDetailedPrices = true, servicesTotal, hardwareTotal, furnitureTotal, offerTotal, dateStr, countertopStandardLength } = sharedOfferData;
+    const { projectName, clientName, estimatedDelivery, items, hardware, materials, includeHardware, includeServices, includeMaterials, includeDetailedPrices = true, servicesTotal, hardwareTotal, furnitureTotal, offerTotal, dateStr, countertopStandardLength, notes } = sharedOfferData;
     const totalCountertopMb = items.reduce((acc, item) => item.category === 'blat' ? acc + (item.raw?.countertopMb || 0) : acc, 0);
 
     return (
@@ -439,7 +441,7 @@ const App = () => {
             {/* Nagłówek */}
             <div className="border-b-4 border-stone-900 pb-8 mb-10">
               <div className="flex justify-between items-start">
-                <div><h1 className="text-4xl font-black uppercase tracking-tighter text-stone-900">Oferta Kosztowa</h1><p className="font-bold text-stone-500 mt-2 uppercase tracking-widest text-sm">{projectName}</p></div>
+                <div><h1 className="text-4xl font-black uppercase tracking-tighter text-stone-900">Oferta</h1><p className="font-bold text-stone-500 mt-2 uppercase tracking-widest text-sm">{projectName}</p></div>
                 <div className="text-right"><p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">Data Wystawienia</p><p className="font-bold text-stone-800 bg-stone-100 px-3 py-1 rounded-md capitalize">{dateStr}</p></div>
               </div>
               <div className="mt-8 flex flex-wrap gap-4">
@@ -469,7 +471,12 @@ const App = () => {
                   {items.map((item, index) => (
                     <tr key={index} className="border-b border-stone-100">
                       <td className="py-4 px-4 font-bold text-stone-400">{index + 1}.</td>
-                      <td className="py-4 px-4"><span className="font-bold text-stone-800 text-base">{item.name}</span><div className="text-[10px] text-stone-500 font-medium uppercase tracking-widest mt-1">{getCategoryName(item)}</div></td>
+                      <td className="py-4 px-4">
+                        <span className="font-bold text-stone-800 text-base">
+                          {item.name} {item.category === 'formatka' && (item.quantity || 1) > 1 && <span className="text-stone-500 font-medium ml-1">(x{item.quantity})</span>}
+                        </span>
+                        <div className="text-[10px] text-stone-500 font-medium uppercase tracking-widest mt-1">{getCategoryName(item)}</div>
+                      </td>
                       <td className="py-4 px-4 text-center font-medium text-stone-600">{getDimString(item)}</td>
                       {includeDetailedPrices && <td className="py-4 px-4 font-black text-right text-stone-800 whitespace-nowrap">{item.totalPrice.toLocaleString()} zł</td>}
                     </tr>
@@ -539,19 +546,22 @@ const App = () => {
               </div>
             )}
 
+            {/* Uwagi do oferty */}
+            {notes && (
+              <div className="mb-10 page-break-inside-avoid">
+                <h3 className="text-sm font-black text-stone-800 uppercase tracking-widest mb-4 border-l-4 border-stone-800 pl-3">Uwagi do oferty</h3>
+                <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200 text-sm font-medium text-stone-700 whitespace-pre-wrap leading-relaxed">
+                  {notes}
+                </div>
+              </div>
+            )}
+
             {/* Podsumowanie */}
             <div className="flex justify-end pt-8 mt-12 border-t-2 border-stone-200 page-break-inside-avoid">
               <div className="w-full md:w-2/3 bg-stone-50 p-6 rounded-2xl">
                 <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4 text-right">Podsumowanie Kosztów</h3>
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-sm font-bold text-stone-600">
-                    <span>Suma Wartości Mebli:</span>
-                    <span className="text-stone-800">{(furnitureTotal + (includeHardware ? hardwareTotal : 0)).toLocaleString()} zł</span>
-                  </div>
-                  {includeServices && servicesTotal > 0 && <div className="flex justify-between text-sm font-bold text-stone-600"><span>Usługi Dodatkowe:</span><span className="text-stone-800">{servicesTotal.toLocaleString()} zł</span></div>}
-                </div>
-                <div className="border-t-2 border-stone-200 pt-6 flex flex-col items-end">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Szacunkowy całkowity koszt</span>
+                <div className="pt-2 flex flex-col items-end">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Całkowity koszt inwestycji</span>
                   <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-stone-900">{offerTotal.toLocaleString()}</span><span className="text-xl font-bold text-stone-500">PLN</span></div>
                 </div>
               </div>
@@ -636,7 +646,7 @@ const App = () => {
                       </div>
                       <div>
                         <h3 className="font-bold text-stone-800 text-lg flex items-center gap-2">
-                          {item.name} 
+                          {item.name} {item.category === 'formatka' && (item.quantity || 1) > 1 && <span className="text-stone-500 text-sm font-medium ml-1">(x{item.quantity})</span>}
                           <span className="text-[10px] bg-stone-100 text-stone-500 px-2 py-1 rounded-full uppercase tracking-wider font-bold">
                             {getCategoryName(item)}
                           </span>
@@ -710,10 +720,6 @@ const App = () => {
                <div className="z-10 w-full text-center sm:text-left">
                   <p className="text-stone-400 text-xs font-black uppercase tracking-widest mb-2">Szacunkowy całkowity koszt</p>
                   <h2 className="text-5xl font-black tracking-tighter">{finalProjectTotal.toLocaleString()} <span className="text-3xl text-stone-500">PLN</span></h2>
-                  <div className="mt-4 flex flex-wrap gap-4 justify-center sm:justify-start">
-                    <div className="bg-stone-800/50 px-4 py-2 rounded-xl text-xs font-bold text-stone-300 uppercase tracking-wider border border-stone-700/50">Suma Robocizny: <span className="text-white ml-1">{finalSplit.totalLabor.toLocaleString()} zł</span></div>
-                    <div className="bg-stone-800/50 px-4 py-2 rounded-xl text-xs font-bold text-stone-300 uppercase tracking-wider border border-stone-700/50">Suma Materiałów: <span className="text-white ml-1">{finalSplit.totalMaterials.toLocaleString()} zł</span></div>
-                  </div>
                </div>
             </div>
           </div>
@@ -1059,6 +1065,11 @@ const App = () => {
                    <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest block mb-2 ml-1">Długość standardowa blatu (mm)</label>
                    <input type="number" placeholder="4100" className="w-full p-4 bg-stone-50 rounded-2xl text-sm font-bold border-2 border-transparent outline-none focus:border-stone-200 focus:bg-white transition-colors" value={offerConfig.countertopStandardLength} onChange={e => setOfferConfig({...offerConfig, countertopStandardLength: Number(e.target.value)})} />
                  </div>
+
+                 <div className="mb-6">
+                   <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest block mb-2 ml-1">Uwagi do oferty (Opcjonalnie)</label>
+                   <textarea placeholder="Wpisz dodatkowe informacje, warunki płatności lub inne uwagi dla klienta..." className="w-full p-4 bg-stone-50 rounded-2xl text-sm font-medium border-2 border-transparent outline-none focus:border-stone-200 focus:bg-white transition-colors min-h-[100px] resize-y" value={offerConfig.notes || ''} onChange={e => setOfferConfig({...offerConfig, notes: e.target.value})} />
+                 </div>
                  
                  <div className="space-y-3 mb-6 border-t border-stone-100 pt-6">
                     <label className="flex items-center justify-between p-4 bg-stone-50 hover:bg-stone-100 rounded-2xl cursor-pointer transition-colors">
@@ -1077,12 +1088,6 @@ const App = () => {
                       <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">Pokaż listę okuć</span>
                       <div className={`w-10 h-6 rounded-full relative transition-colors ${offerConfig.includeHardware ? 'bg-stone-800' : 'bg-stone-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${offerConfig.includeHardware ? 'left-5' : 'left-1'}`}></div></div>
                       <input type="checkbox" className="hidden" checked={offerConfig.includeHardware} onChange={e => setOfferConfig({...offerConfig, includeHardware: e.target.checked})}/>
-                    </label>
-                    
-                    <label className="flex items-center justify-between p-4 bg-stone-50 hover:bg-stone-100 rounded-2xl cursor-pointer transition-colors">
-                      <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">Pokaż usługi montażu</span>
-                      <div className={`w-10 h-6 rounded-full relative transition-colors ${offerConfig.includeServices ? 'bg-stone-800' : 'bg-stone-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${offerConfig.includeServices ? 'left-5' : 'left-1'}`}></div></div>
-                      <input type="checkbox" className="hidden" checked={offerConfig.includeServices} onChange={e => setOfferConfig({...offerConfig, includeServices: e.target.checked})}/>
                     </label>
                  </div>
 
@@ -1118,7 +1123,7 @@ const App = () => {
                   <div className="border-b-4 border-stone-900 pb-8 mb-10">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h1 className="text-4xl font-black uppercase tracking-tighter text-stone-900">Oferta Kosztowa</h1>
+                        <h1 className="text-4xl font-black uppercase tracking-tighter text-stone-900">Oferta</h1>
                         <p className="font-bold text-stone-500 mt-2 uppercase tracking-widest text-sm">{currentProjectName}</p>
                       </div>
                       <div className="text-right">
@@ -1165,7 +1170,9 @@ const App = () => {
                             <tr key={item.id} className="border-b border-stone-100">
                               <td className="py-4 px-4 font-bold text-stone-400">{index + 1}.</td>
                               <td className="py-4 px-4">
-                                <span className="font-bold text-stone-800 text-base">{item.name}</span>
+                                <span className="font-bold text-stone-800 text-base">
+                                  {item.name} {item.category === 'formatka' && (item.quantity || 1) > 1 && <span className="text-stone-500 font-medium ml-1">(x{item.quantity})</span>}
+                                </span>
                                 <div className="text-[10px] text-stone-500 font-medium uppercase tracking-widest mt-1">{getCategoryName(item)}</div>
                               </td>
                               <td className="py-4 px-4 text-center font-medium text-stone-600">{getDimString(item)}</td>
@@ -1242,19 +1249,22 @@ const App = () => {
                     </div>
                   )}
 
+                  {/* Uwagi do oferty */}
+                  {offerConfig.notes && (
+                    <div className="mb-10 page-break-inside-avoid">
+                      <h3 className="text-sm font-black text-stone-800 uppercase tracking-widest mb-4 border-l-4 border-stone-800 pl-3">Uwagi do oferty</h3>
+                      <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200 text-sm font-medium text-stone-700 whitespace-pre-wrap leading-relaxed">
+                        {offerConfig.notes}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Podsumowanie i Koszty Całkowite */}
                   <div className="flex justify-end pt-8 mt-12 border-t-2 border-stone-200 page-break-inside-avoid">
                     <div className="w-full md:w-2/3 bg-stone-50 p-6 rounded-2xl">
                       <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4 text-right">Podsumowanie Kosztów</h3>
-                      <div className="space-y-3 mb-6">
-                        <div className="flex justify-between text-sm font-bold text-stone-600">
-                          <span>Suma Wartości Mebli:</span>
-                          <span className="text-stone-800">{(offerItems.reduce((acc, item) => acc + item.totalPrice, 0) + (offerConfig.includeHardware ? hardwareTotalSum : 0)).toLocaleString()} zł</span>
-                        </div>
-                        {offerConfig.includeServices && servicesTotalSum > 0 && <div className="flex justify-between text-sm font-bold text-stone-600"><span>Usługi Dodatkowe:</span><span className="text-stone-800">{servicesTotalSum.toLocaleString()} zł</span></div>}
-                      </div>
-                      <div className="border-t-2 border-stone-200 pt-6 flex flex-col items-end">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Szacunkowy całkowity koszt</span>
+                      <div className="pt-2 flex flex-col items-end">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Całkowity koszt inwestycji</span>
                         <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-stone-900">{offerTotal.toLocaleString()}</span><span className="text-xl font-bold text-stone-500">PLN</span></div>
                       </div>
                     </div>
@@ -1287,7 +1297,7 @@ const App = () => {
                    <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'hanging', heightType: '720', depthType: '300'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowUpToLine size={24}/></div> Szafka Wisząca</button>
                    <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'standing', heightType: '720', depthType: '510'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowDownToLine size={24}/></div> Szafka Stojąca</button>
                    <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'blat', widthType: '2000', depthType: '600', thickness: '38'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-amber-600 hover:bg-amber-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Ruler size={24}/></div> Blat Roboczy</button>
-                   <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'formatka', widthType: '600', heightType: '720', isEdged: true, boardMaterial: 'korpus'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-orange-600 hover:bg-orange-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Layers size={24}/></div> Poj. Formatka</button>
+                   <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'formatka', widthType: '600', heightType: '720', isEdged: true, boardMaterial: 'korpus', quantity: 1})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-orange-600 hover:bg-orange-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Layers size={24}/></div> Poj. Formatka</button>
                  </div>
                </div>
              )}
@@ -1403,6 +1413,15 @@ const App = () => {
              {builderStep === 4 && currentFurniture.category === 'formatka' && (
                <div className="space-y-6 text-center mt-2">
                   <h2 className="text-2xl font-black mb-8 uppercase text-stone-800">Opcje Formatki</h2>
+
+                  <div className="bg-white p-6 rounded-2xl border-2 border-stone-100 flex flex-col items-center">
+                    <p className="text-[10px] font-black uppercase text-stone-400 mb-4">Ilość sztuk (np. półki)</p>
+                    <div className="flex items-center gap-6">
+                      <button onClick={() => setCurrentFurniture({...currentFurniture, quantity: Math.max(1, (currentFurniture.quantity || 1) - 1)})} className="w-12 h-12 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 font-black text-xl flex items-center justify-center transition-colors"><Minus size={20}/></button>
+                      <span className="text-3xl font-black text-stone-800 w-12 text-center">{currentFurniture.quantity || 1}</span>
+                      <button onClick={() => setCurrentFurniture({...currentFurniture, quantity: (currentFurniture.quantity || 1) + 1})} className="w-12 h-12 rounded-xl bg-stone-800 hover:bg-stone-900 text-white font-black text-xl flex items-center justify-center transition-colors"><Plus size={20}/></button>
+                    </div>
+                  </div>
 
                   <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200">
                     <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4">Materiał Płyty</p>
