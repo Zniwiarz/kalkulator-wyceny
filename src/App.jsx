@@ -74,6 +74,7 @@ const App = () => {
   const [searchHardware, setSearchHardware] = useState('');
   const [showAddGlobalModal, setShowAddGlobalModal] = useState(false);
   const [newGlobalHardware, setNewGlobalHardware] = useState({ name: '', category: 'Szuflady', unitPrice: 0, imageUrl: '', linkUrl: '' });
+  const [editingHardwareId, setEditingHardwareId] = useState(null);
 
   // Stany materiałów
   const [projectMaterials, setProjectMaterials] = useState([]);
@@ -81,6 +82,7 @@ const App = () => {
   const [searchMaterial, setSearchMaterial] = useState('');
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [newMaterial, setNewMaterial] = useState({ name: '', category: 'Płyta korpusowa', imageUrl: '', linkUrl: '' });
+  const [editingMaterialId, setEditingMaterialId] = useState(null);
   
   // Stany oferty i kreatora
   const [offerConfig, setOfferConfig] = useState({ clientName: '', estimatedDelivery: '', includeWholesale: false, includeServices: true, includeHardware: true, includeMaterials: true, includeDetailedPrices: true, selectedItems: {}, countertopStandardLength: 4100 });
@@ -297,6 +299,18 @@ const App = () => {
 
   const requestConfirm = (title, message, onConfirm) => {
     setConfirmDialog({ isOpen: true, title, message, onConfirm });
+  };
+
+  const handleEditHardware = (hw) => {
+    setNewGlobalHardware({ ...hw });
+    setEditingHardwareId(hw.id);
+    setShowAddGlobalModal(true);
+  };
+
+  const handleEditMaterial = (mat) => {
+    setNewMaterial({ ...mat });
+    setEditingMaterialId(mat.id);
+    setShowAddMaterialModal(true);
   };
 
   // --- GENEROWANIE LINKU ---
@@ -743,7 +757,7 @@ const App = () => {
                <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                    <h2 className="text-2xl font-black text-stone-800 flex items-center gap-3"><Wrench className="text-stone-800" size={24} /> Baza Okuć</h2>
-                   <button onClick={() => setShowAddGlobalModal(true)} className="bg-stone-100 text-stone-800 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-stone-200 transition-colors"><Plus size={16}/> Dodaj okucie</button>
+                   <button onClick={() => { setEditingHardwareId(null); setNewGlobalHardware({ name: '', category: 'Szuflady', unitPrice: 0, imageUrl: '', linkUrl: '' }); setShowAddGlobalModal(true); }} className="bg-stone-100 text-stone-800 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-stone-200 transition-colors"><Plus size={16}/> Dodaj okucie</button>
                  </div>
                  <div className="relative mb-6">
                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={18}/>
@@ -755,7 +769,10 @@ const App = () => {
                        <div>
                          <div className="flex justify-between items-start mb-3">
                            <p className="text-[9px] uppercase font-black text-stone-600 tracking-widest bg-stone-100 px-2 py-1 rounded-md">{hw.category}</p>
-                           <button onClick={() => requestConfirm("Usuń okucie", `Usunąć ${hw.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'hardware_db', hw.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
+                           <div className="flex gap-2">
+                             <button onClick={() => handleEditHardware(hw)} className="text-stone-300 hover:text-stone-800 opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>
+                             <button onClick={() => requestConfirm("Usuń okucie", `Usunąć ${hw.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'hardware_db', hw.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
+                           </div>
                          </div>
                          <div className="flex gap-3 items-center">
                            {hw.imageUrl ? (
@@ -789,7 +806,7 @@ const App = () => {
                <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                    <h2 className="text-2xl font-black text-stone-800 flex items-center gap-3"><Package className="text-stone-800" size={24} /> Baza Materiałów</h2>
-                   <button onClick={() => setShowAddMaterialModal(true)} className="bg-stone-100 text-stone-800 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-stone-200 transition-colors"><Plus size={16}/> Dodaj materiał</button>
+                   <button onClick={() => { setEditingMaterialId(null); setNewMaterial({ name: '', category: 'Płyta korpusowa', imageUrl: '', linkUrl: '' }); setShowAddMaterialModal(true); }} className="bg-stone-100 text-stone-800 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-stone-200 transition-colors"><Plus size={16}/> Dodaj materiał</button>
                  </div>
                  <div className="relative mb-6">
                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={18}/>
@@ -803,7 +820,10 @@ const App = () => {
                          <div>
                            <div className="flex justify-between items-start mb-3">
                              <p className="text-[9px] uppercase font-black text-stone-600 tracking-widest bg-stone-100 px-2 py-1 rounded-md">{mat.category}</p>
-                             <button onClick={() => requestConfirm("Usuń materiał", `Usunąć ${mat.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'materials_db', mat.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
+                             <div className="flex gap-2">
+                               <button onClick={() => handleEditMaterial(mat)} className="text-stone-300 hover:text-stone-800 opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>
+                               <button onClick={() => requestConfirm("Usuń materiał", `Usunąć ${mat.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'materials_db', mat.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
+                             </div>
                            </div>
                            <div className="flex gap-3 items-center">
                              {mat.imageUrl ? (
@@ -1436,12 +1456,12 @@ const App = () => {
         </div>
       )}
 
-      {/* 2. DODAJ OKUCIE */}
+      {/* 2. DODAJ/EDYTUJ OKUCIE */}
       {showAddGlobalModal && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-stone-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <h3 className="font-black text-xl mb-6 uppercase tracking-tight text-center text-stone-800 flex flex-col items-center gap-3">
-              <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Wrench size={24}/></div> Dodaj Nowe Okucie
+              <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Wrench size={24}/></div> {editingHardwareId ? "Edytuj Okucie" : "Dodaj Nowe Okucie"}
             </h3>
             
             <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Kategoria</label>
@@ -1465,19 +1485,29 @@ const App = () => {
             </div>
             
             <div className="flex gap-3">
-              <button onClick={()=>setShowAddGlobalModal(false)} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
-              <button onClick={async () => { if (!user || !newGlobalHardware.name) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'hardware_db'), { ...newGlobalHardware, createdAt: serverTimestamp() }); setShowAddGlobalModal(false); setNewGlobalHardware({ name: '', category: 'Szuflady', unitPrice: 0, imageUrl: '', linkUrl: '' }); }} disabled={!newGlobalHardware.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz</button>
+              <button onClick={()=>{ setShowAddGlobalModal(false); setEditingHardwareId(null); }} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
+              <button onClick={async () => { 
+                if (!user || !newGlobalHardware.name) return; 
+                if (editingHardwareId) {
+                  await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'hardware_db', editingHardwareId), { ...newGlobalHardware });
+                } else {
+                  await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'hardware_db'), { ...newGlobalHardware, createdAt: serverTimestamp() });
+                }
+                setShowAddGlobalModal(false); 
+                setEditingHardwareId(null);
+                setNewGlobalHardware({ name: '', category: 'Szuflady', unitPrice: 0, imageUrl: '', linkUrl: '' }); 
+              }} disabled={!newGlobalHardware.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 3. DODAJ MATERIAŁ */}
+      {/* 3. DODAJ/EDYTUJ MATERIAŁ */}
       {showAddMaterialModal && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 border border-stone-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <h3 className="font-black text-xl mb-6 uppercase tracking-tight text-center text-stone-800 flex flex-col items-center gap-3">
-              <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Package size={24}/></div> Dodaj Materiał
+              <div className="bg-stone-100 p-3 rounded-full text-stone-800"><Package size={24}/></div> {editingMaterialId ? "Edytuj Materiał" : "Dodaj Materiał"}
             </h3>
             
             <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block">Kategoria</label>
@@ -1495,8 +1525,18 @@ const App = () => {
             <input className="w-full p-4 bg-stone-50 rounded-xl mb-6 font-bold text-xs border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" placeholder="https://sklep..." value={newMaterial.linkUrl} onChange={e=>setNewMaterial({...newMaterial, linkUrl: e.target.value})} />
             
             <div className="flex gap-3">
-              <button onClick={()=>setShowAddMaterialModal(false)} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
-              <button onClick={async () => { if (!user || !newMaterial.name) return; await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'materials_db'), { ...newMaterial, createdAt: serverTimestamp() }); setShowAddMaterialModal(false); setNewMaterial({ name: '', category: 'Płyta korpusowa', imageUrl: '', linkUrl: '' }); }} disabled={!newMaterial.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz</button>
+              <button onClick={()=>{ setShowAddMaterialModal(false); setEditingMaterialId(null); }} className="flex-1 py-4 bg-stone-100 text-stone-600 font-black rounded-xl text-xs uppercase hover:bg-stone-200 transition-colors">Anuluj</button>
+              <button onClick={async () => { 
+                if (!user || !newMaterial.name) return; 
+                if (editingMaterialId) {
+                  await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'materials_db', editingMaterialId), { ...newMaterial });
+                } else {
+                  await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'materials_db'), { ...newMaterial, createdAt: serverTimestamp() });
+                }
+                setShowAddMaterialModal(false); 
+                setEditingMaterialId(null);
+                setNewMaterial({ name: '', category: 'Płyta korpusowa', imageUrl: '', linkUrl: '' }); 
+              }} disabled={!newMaterial.name} className="flex-1 py-4 bg-stone-800 text-white font-black rounded-xl text-xs uppercase shadow-md hover:bg-stone-900 disabled:opacity-50 transition-colors">Zapisz</button>
             </div>
           </div>
         </div>
