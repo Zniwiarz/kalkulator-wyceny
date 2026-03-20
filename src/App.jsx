@@ -7,7 +7,7 @@ import {
   FolderOpen, X, FilePlus, Layers, Layout, Scissors, Ruler, Palette, 
   ArrowUpToLine, ArrowDownToLine, FileText, Wrench, Search, Minus,
   CheckSquare, Square, CheckCircle2, Link as LinkIcon, Loader2, ClipboardList,
-  Package, Image as ImageIcon, ExternalLink
+  Package, Image as ImageIcon, ExternalLink, Sliders
 } from 'lucide-react';
 
 // TWOJA KONFIGURACJA FIREBASE
@@ -24,6 +24,19 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'stolarnia-master-calc-prod';
+
+// Domyślne ustawienia i mnożniki
+const defaultSettings = {
+  laborRate: 50, baseHoursPerItem: 4, laborDiscount: 0, 
+  priceOkap: 250, priceZlew: 200, pricePlata: 200, platePriceM2: 120,    
+  edgingPriceMb: 5, cuttingPriceMb: 2, frontStandardPriceM2: 150,
+  frontMatPriceM2: 250, frontLakierPriceM2: 450, frontRyflowanyPriceM2: 600,
+  countertopPriceMb: 150,
+  // Mnożniki
+  multHangingProsty: 1.2, multHangingSkomplik: 1.4,
+  multStandingProsty: 1.0, multStandingSkomplik: 1.3,
+  multStandingSzufladyBase: 1.3, multStandingSzufladyPerDrawer: 0.05
+};
 
 const App = () => {
   // --- STANY APLIKACJI ---
@@ -48,13 +61,7 @@ const App = () => {
   // Stany globalne wyceny
   const [globalCalcMaterials, setGlobalCalcMaterials] = useState(true);
   const [globalFrontType, setGlobalFrontType] = useState('standard');
-  const [baseSettings, setBaseSettings] = useState({
-    laborRate: 50, baseHoursPerItem: 4, laborDiscount: 0, 
-    priceOkap: 250, priceZlew: 200, pricePlata: 200, platePriceM2: 120,    
-    edgingPriceMb: 5, cuttingPriceMb: 2, frontStandardPriceM2: 150,
-    frontMatPriceM2: 250, frontLakierPriceM2: 450, frontRyflowanyPriceM2: 600,
-    countertopPriceMb: 150
-  });
+  const [baseSettings, setBaseSettings] = useState(defaultSettings);
 
   // Stany list i kosztów dodatkowych
   const [wholesaleExtraCost, setWholesaleExtraCost] = useState(0);
@@ -163,10 +170,22 @@ const App = () => {
     let hours = settings.baseHoursPerItem || 4;
     let multiplier = 1.0;
     
-    if (item.category === 'hanging') multiplier = item.type === 'skomplikowany' ? 1.4 : 1.2;
-    else if (item.category === 'standing') multiplier = item.type === 'skomplikowany' ? 1.3 : item.type === 'szuflady' ? 1.3 + (Number(item.drawerCount || 0) * 0.05) : 1.0;
-    else if (item.category === 'blat') hours = (settings.baseHoursPerItem || 4) * 0.2; 
-    else if (item.category === 'formatka') hours = (settings.baseHoursPerItem || 4) * 0.1; 
+    const mHP = settings.multHangingProsty ?? 1.2;
+    const mHS = settings.multHangingSkomplik ?? 1.4;
+    const mSP = settings.multStandingProsty ?? 1.0;
+    const mSS = settings.multStandingSkomplik ?? 1.3;
+    const mSSzB = settings.multStandingSzufladyBase ?? 1.3;
+    const mSSzD = settings.multStandingSzufladyPerDrawer ?? 0.05;
+
+    if (item.category === 'hanging') {
+      multiplier = item.type === 'skomplikowany' ? mHS : mHP;
+    } else if (item.category === 'standing') {
+      multiplier = item.type === 'skomplikowany' ? mSS : item.type === 'szuflady' ? mSSzB + (Number(item.drawerCount || 0) * mSSzD) : mSP;
+    } else if (item.category === 'blat') {
+      hours = (settings.baseHoursPerItem || 4) * 0.2; 
+    } else if (item.category === 'formatka') {
+      hours = (settings.baseHoursPerItem || 4) * 0.1; 
+    }
     
     hours *= multiplier;
     const laborCostRaw = hours * (settings.laborRate || 50);
@@ -271,7 +290,7 @@ const App = () => {
   const loadProject = (p) => {
     setQuoteItems(p.items || []); setHardwareItems(p.hardware || []); setProjectMaterials(p.materials || []); setWholesaleExtraCost(p.wholesale || 0);
     setExtraServices(p.services || { okap: false, zlew: false, plata: false, customName: '', customValue: 0 });
-    setBaseSettings({ ...baseSettings, ...(p.settings || {}) }); 
+    setBaseSettings({ ...defaultSettings, ...(p.settings || {}) }); 
     setGlobalCalcMaterials(p.globalCalcMaterials ?? true); setGlobalFrontType(p.globalFrontType || 'standard');
     setCurrentProjectName(p.name); setCurrentProjectId(p.id); setActiveTab('summary');
   };
@@ -511,22 +530,17 @@ const App = () => {
               <div className="w-full md:w-2/3 bg-stone-50 p-6 rounded-2xl">
                 <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4 text-right">Podsumowanie Kosztów</h3>
                 <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-sm font-bold text-stone-600"><span>Suma Wartości Mebli / Materiałów:</span><span className="text-stone-800">{furnitureTotal.toLocaleString()} zł</span></div>
-                  {includeHardware && hardware.length > 0 && <div className="flex justify-between text-sm font-bold text-stone-600"><span>Suma Wartości Okuć:</span><span className="text-stone-800">{hardwareTotal.toLocaleString()} zł</span></div>}
+                  <div className="flex justify-between text-sm font-bold text-stone-600">
+                    <span>Suma Wartości Mebli:</span>
+                    <span className="text-stone-800">{(furnitureTotal + (includeHardware ? hardwareTotal : 0)).toLocaleString()} zł</span>
+                  </div>
                   {includeServices && servicesTotal > 0 && <div className="flex justify-between text-sm font-bold text-stone-600"><span>Usługi Dodatkowe:</span><span className="text-stone-800">{servicesTotal.toLocaleString()} zł</span></div>}
                 </div>
                 <div className="border-t-2 border-stone-200 pt-6 flex flex-col items-end">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Do zapłaty całkowitej</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Szacunkowy całkowity koszt</span>
                   <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-stone-900">{offerTotal.toLocaleString()}</span><span className="text-xl font-bold text-stone-500">PLN</span></div>
                 </div>
               </div>
-            </div>
-            
-            {/* ODRĘCZNY PODPIS */}
-            <div className="mt-16 flex items-center w-full gap-6 opacity-60 page-break-inside-avoid">
-              <div className="h-[1px] bg-stone-300 flex-1"></div>
-              <span className="text-lg sm:text-xl font-bold text-stone-600 tracking-widest whitespace-nowrap" style={{ fontFamily: "'Poiret One', sans-serif" }}>Weronika Hutyra</span>
-              <div className="h-[1px] bg-stone-300 flex-1"></div>
             </div>
 
             <div className="mt-16 pt-6 border-t border-stone-100 text-center">
@@ -563,6 +577,7 @@ const App = () => {
           <TabBtn id="hardware" label="Okucia i materiały" icon={Wrench} />
           <TabBtn id="projects" label="Archiwum" icon={FolderOpen} />
           <TabBtn id="settings" label="Cennik" icon={Settings} />
+          <TabBtn id="multipliers" label="Mnożniki" icon={Sliders} />
           <TabBtn id="offer" label="Oferta" icon={FileText} />
         </div>
       </nav>
@@ -586,7 +601,6 @@ const App = () => {
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => requestConfirm("Nowa wycena", "Obecny niezapisany postęp zostanie utracony. Kontynuować?", () => { setQuoteItems([]); setHardwareItems([]); setProjectMaterials([]); setCurrentProjectId(null); setCurrentProjectName('Nowa wycena'); })} className="bg-white p-2.5 border border-stone-200 rounded-xl shadow-sm hover:bg-stone-50 transition-colors" title="Rozpocznij nową wycenę"><FilePlus size={18} className="text-stone-600" /></button>
                 
-                {/* TO JEST PRZYCISK ZAPISZ, KTÓRY AKTYWUJE MODAL */}
                 <button 
                   onClick={() => setShowSaveModal(true)} 
                   className="bg-white border-2 border-stone-800 text-stone-800 px-5 py-2.5 rounded-xl font-bold text-sm flex gap-2 items-center hover:bg-stone-50 transition-colors shadow-sm"
@@ -680,7 +694,7 @@ const App = () => {
             <div className="bg-stone-900 text-white p-8 sm:p-10 rounded-[40px] shadow-2xl flex flex-col sm:flex-row justify-between items-center gap-6 relative overflow-hidden">
                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
                <div className="z-10 w-full text-center sm:text-left">
-                  <p className="text-stone-400 text-xs font-black uppercase tracking-widest mb-2">Do zapłaty całkowitej przez Klienta</p>
+                  <p className="text-stone-400 text-xs font-black uppercase tracking-widest mb-2">Szacunkowy całkowity koszt</p>
                   <h2 className="text-5xl font-black tracking-tighter">{finalProjectTotal.toLocaleString()} <span className="text-3xl text-stone-500">PLN</span></h2>
                   <div className="mt-4 flex flex-wrap gap-4 justify-center sm:justify-start">
                     <div className="bg-stone-800/50 px-4 py-2 rounded-xl text-xs font-bold text-stone-300 uppercase tracking-wider border border-stone-700/50">Suma Robocizny: <span className="text-white ml-1">{finalSplit.totalLabor.toLocaleString()} zł</span></div>
@@ -941,6 +955,34 @@ const App = () => {
           </div>
         )}
 
+        {/* --- 4B. ZAKŁADKA MNOŻNIKI --- */}
+        {activeTab === 'multipliers' && (
+          <div className="max-w-3xl mx-auto bg-white p-8 sm:p-12 rounded-[40px] border border-stone-200 shadow-xl space-y-8 animate-in zoom-in-95">
+             <div className="text-center">
+               <div className="bg-stone-100 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"><Sliders className="text-stone-800" size={32}/></div>
+               <h2 className="text-3xl font-black text-stone-800 tracking-tight">Mnożniki Czasu Pracy</h2>
+               <p className="text-sm font-medium text-stone-500 mt-2">Dostosuj współczynniki trudności dla poszczególnych modułów. Mnożą one bazowy czas (h/szafkę).</p>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-stone-100">
+               {/* Szafki Wiszące */}
+               <div className="bg-stone-50 p-6 rounded-3xl border border-stone-200 space-y-4">
+                 <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 border-b border-stone-200 pb-2"><ArrowUpToLine className="inline mr-2" size={16}/>Szafki Wiszące</h3>
+                 <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Moduł Standardowy</label><input type="number" step="0.1" className="w-full mt-1.5 p-3 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.multHangingProsty ?? 1.2} onChange={e => setBaseSettings({...baseSettings, multHangingProsty: Number(e.target.value)})} /></div>
+                 <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Złożony / Narożny</label><input type="number" step="0.1" className="w-full mt-1.5 p-3 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.multHangingSkomplik ?? 1.4} onChange={e => setBaseSettings({...baseSettings, multHangingSkomplik: Number(e.target.value)})} /></div>
+               </div>
+               {/* Szafki Stojące */}
+               <div className="bg-stone-50 p-6 rounded-3xl border border-stone-200 space-y-4">
+                 <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 border-b border-stone-200 pb-2"><ArrowDownToLine className="inline mr-2" size={16}/>Szafki Stojące</h3>
+                 <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Moduł Standardowy</label><input type="number" step="0.1" className="w-full mt-1.5 p-3 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.multStandingProsty ?? 1.0} onChange={e => setBaseSettings({...baseSettings, multStandingProsty: Number(e.target.value)})} /></div>
+                 <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Złożony / Narożny</label><input type="number" step="0.1" className="w-full mt-1.5 p-3 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.multStandingSkomplik ?? 1.3} onChange={e => setBaseSettings({...baseSettings, multStandingSkomplik: Number(e.target.value)})} /></div>
+                 <div className="pt-2"><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Z szufladami (Baza)</label><input type="number" step="0.1" className="w-full mt-1.5 p-3 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.multStandingSzufladyBase ?? 1.3} onChange={e => setBaseSettings({...baseSettings, multStandingSzufladyBase: Number(e.target.value)})} /></div>
+                 <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Dodatek za 1 szufladę</label><input type="number" step="0.01" className="w-full mt-1.5 p-3 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.multStandingSzufladyPerDrawer ?? 0.05} onChange={e => setBaseSettings({...baseSettings, multStandingSzufladyPerDrawer: Number(e.target.value)})} /></div>
+               </div>
+             </div>
+             <button onClick={() => setActiveTab('summary')} className="w-full py-5 mt-6 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all">Zapisz ustawienia</button>
+          </div>
+        )}
+
         {/* --- 5. ZAKŁADKA ARCHIWUM --- */}
         {activeTab === 'projects' && (
           <div className="space-y-6 animate-in fade-in">
@@ -966,7 +1008,7 @@ const App = () => {
                {cloudProjects.length === 0 && (
                  <div className="col-span-full py-20 text-center flex flex-col items-center">
                    <div className="bg-white p-6 rounded-full shadow-sm border border-stone-200 mb-4"><FolderOpen size={48} className="text-stone-300"/></div>
-                   <h3 className="font-black text-stone-400 text-lg">Brak zapisanych projektów</h3>
+                   <h3 className="font-black text-stone-400 text-lg">Brak zapisanych projects</h3>
                  </div>
                )}
              </div>
@@ -1185,22 +1227,21 @@ const App = () => {
                     <div className="w-full md:w-2/3 bg-stone-50 p-6 rounded-2xl">
                       <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4 text-right">Podsumowanie Kosztów</h3>
                       <div className="space-y-3 mb-6">
-                        <div className="flex justify-between text-sm font-bold text-stone-600"><span>Suma Wartości Mebli / Materiałów:</span><span className="text-stone-800">{offerItems.reduce((acc, item) => acc + item.totalPrice, 0).toLocaleString()} zł</span></div>
-                        {offerConfig.includeHardware && hardwareItems.length > 0 && <div className="flex justify-between text-sm font-bold text-stone-600"><span>Suma Wartości Okuć:</span><span className="text-stone-800">{hardwareTotalSum.toLocaleString()} zł</span></div>}
+                        <div className="flex justify-between text-sm font-bold text-stone-600">
+                          <span>Suma Wartości Mebli:</span>
+                          <span className="text-stone-800">{(offerItems.reduce((acc, item) => acc + item.totalPrice, 0) + (offerConfig.includeHardware ? hardwareTotalSum : 0)).toLocaleString()} zł</span>
+                        </div>
                         {offerConfig.includeServices && servicesTotalSum > 0 && <div className="flex justify-between text-sm font-bold text-stone-600"><span>Usługi Dodatkowe:</span><span className="text-stone-800">{servicesTotalSum.toLocaleString()} zł</span></div>}
                       </div>
                       <div className="border-t-2 border-stone-200 pt-6 flex flex-col items-end">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Do zapłaty całkowitej</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Szacunkowy całkowity koszt</span>
                         <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-stone-900">{offerTotal.toLocaleString()}</span><span className="text-xl font-bold text-stone-500">PLN</span></div>
                       </div>
                     </div>
                   </div>
 
-                  {/* ODRĘCZNY PODPIS */}
-                  <div className="mt-16 flex items-center w-full gap-6 opacity-60 page-break-inside-avoid">
-                    <div className="h-[1px] bg-stone-300 flex-1"></div>
-                    <span className="text-lg sm:text-xl font-bold text-stone-600 tracking-widest whitespace-nowrap" style={{ fontFamily: "'Poiret One', sans-serif" }}>Weronika Hutyra</span>
-                    <div className="h-[1px] bg-stone-300 flex-1"></div>
+                  <div className="mt-16 pt-6 border-t border-stone-100 text-center">
+                    <p className="text-[9px] font-bold text-stone-300 uppercase tracking-[0.3em]">Dokument wygenerowany z Master Calc</p>
                   </div>
 
                </div>
