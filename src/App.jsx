@@ -150,7 +150,7 @@ const App = () => {
     }
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser || null); // Jeśli brak usera, ustawiamy na czysty null (kończymy ładowanie)
+      setUser(currentUser || null);
     });
 
     return () => unsubscribe();
@@ -353,7 +353,7 @@ const App = () => {
 
   const saveSettingsToCloud = async () => {
     if (!user) {
-      setActiveTab('summary');
+      setAlertDialog({ isOpen: true, title: "Błąd", message: "Błąd zapisu! Brak połączenia z bazą danych." });
       return;
     }
     try {
@@ -364,10 +364,10 @@ const App = () => {
       } else {
         await setDoc(settingsRef, baseSettings);
       }
-      setActiveTab('summary');
+      setAlertDialog({ isOpen: true, title: "Sukces", message: "Ustawienia cennika zostały pomyślnie zapisane." });
     } catch (e) {
       console.error("Błąd zapisu ustawień:", e);
-      setActiveTab('summary');
+      setAlertDialog({ isOpen: true, title: "Błąd", message: "Wystąpił problem podczas zapisu ustawień." });
     }
   };
 
@@ -1091,6 +1091,165 @@ const App = () => {
           </div>
         )}
 
+        {/* --- 4A. ZAKŁADKA CENNIK --- */}
+        {activeTab === 'settings' && (
+          <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 text-center sm:text-left">
+              <div>
+                <h2 className="text-3xl font-black text-stone-800 tracking-tight flex items-center justify-center sm:justify-start gap-3">
+                  <div className="bg-stone-200 p-2.5 rounded-2xl text-stone-800"><Settings size={28}/></div> Cennik i Ustawienia
+                </h2>
+                <p className="text-sm font-medium text-stone-500 mt-2 sm:ml-14">Skonfiguruj stawki bazowe dla wszystkich nowych wycen.</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleExportBackup} className="bg-white border border-stone-200 text-stone-600 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-stone-50 transition-colors shadow-sm"><Download size={16}/> Eksport Bazy</button>
+                <label className="bg-white border border-stone-200 text-stone-600 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-stone-50 transition-colors shadow-sm cursor-pointer">
+                  <Upload size={16}/> Import Bazy
+                  <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Robocizna */}
+              <div className="bg-white p-6 rounded-[32px] border border-stone-200 shadow-sm space-y-5">
+                <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 border-b border-stone-100 pb-3 flex items-center gap-2"><Wrench size={16}/> Robocizna</h3>
+                
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Stawka roboczogodziny</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.laborRate} onChange={e => setBaseSettings({...baseSettings, laborRate: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Bazowy czas na moduł</label>
+                  <div className="relative">
+                    <input type="number" step="0.5" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.baseHoursPerItem} onChange={e => setBaseSettings({...baseSettings, baseHoursPerItem: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">h</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Rabat na robociznę</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.laborDiscount} onChange={e => setBaseSettings({...baseSettings, laborDiscount: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Materiały */}
+              <div className="bg-white p-6 rounded-[32px] border border-stone-200 shadow-sm space-y-5">
+                <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 border-b border-stone-100 pb-3 flex items-center gap-2"><Layers size={16}/> Materiały Płytowe (Ceny za m²)</h3>
+                
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Płyta korpusowa</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.platePriceM2} onChange={e => setBaseSettings({...baseSettings, platePriceM2: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Front - Standard</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.frontStandardPriceM2} onChange={e => setBaseSettings({...baseSettings, frontStandardPriceM2: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Front - Lakier Mat</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.frontMatPriceM2} onChange={e => setBaseSettings({...baseSettings, frontMatPriceM2: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Front - Lakier Połysk</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.frontLakierPriceM2} onChange={e => setBaseSettings({...baseSettings, frontLakierPriceM2: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Front - MDF Ryflowany</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.frontRyflowanyPriceM2} onChange={e => setBaseSettings({...baseSettings, frontRyflowanyPriceM2: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Usługi stolarskie i blaty */}
+              <div className="bg-white p-6 rounded-[32px] border border-stone-200 shadow-sm space-y-5">
+                <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 border-b border-stone-100 pb-3 flex items-center gap-2"><Scissors size={16}/> Usługi Warsztatowe i Blaty</h3>
+                
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Cięcie płyty (mb)</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.cuttingPriceMb} onChange={e => setBaseSettings({...baseSettings, cuttingPriceMb: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Oklejanie krawędzi (mb)</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.edgingPriceMb} onChange={e => setBaseSettings({...baseSettings, edgingPriceMb: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Blat roboczy (mb)</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.countertopPriceMb} onChange={e => setBaseSettings({...baseSettings, countertopPriceMb: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Usługi AGD */}
+              <div className="bg-white p-6 rounded-[32px] border border-stone-200 shadow-sm space-y-5">
+                <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 border-b border-stone-100 pb-3 flex items-center gap-2"><CheckSquare size={16}/> Montaż Sprzętu AGD</h3>
+                
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Montaż okapu</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.priceOkap} onChange={e => setBaseSettings({...baseSettings, priceOkap: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Montaż zlewu</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.priceZlew} onChange={e => setBaseSettings({...baseSettings, priceZlew: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-stone-500">Montaż płyty</label>
+                  <div className="relative">
+                    <input type="number" className="w-24 p-2 bg-stone-50 rounded-lg text-right font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.pricePlata} onChange={e => setBaseSettings({...baseSettings, pricePlata: Number(e.target.value)})} />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] font-bold">zł</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button onClick={saveSettingsToCloud} className="w-full py-5 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all flex justify-center items-center gap-2">
+              <Save size={20} /> Zapisz Cennik
+            </button>
+          </div>
+        )}
+
         {/* --- 4B. ZAKŁADKA MNOŻNIKI --- */}
         {activeTab === 'multipliers' && (
           <div className="max-w-3xl mx-auto bg-white p-8 sm:p-12 rounded-[40px] border border-stone-200 shadow-xl space-y-8 animate-in zoom-in-95">
@@ -1750,7 +1909,7 @@ const App = () => {
               {alertDialog.message}
             </div>
             <button onClick={() => setAlertDialog({ isOpen: false, title: '', message: '' })} className="w-full py-3.5 bg-stone-800 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md hover:bg-stone-900 transition-colors">
-              Zrozumiałem
+              Zrozumiałam
             </button>
           </div>
         </div>
