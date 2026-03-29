@@ -680,11 +680,6 @@ const App = () => {
           <button onClick={handleGoogleLogin} className="w-full bg-stone-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-300 hover:bg-stone-800 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3">
             Zaloguj przez Google
           </button>
-          <div className="mt-8 pt-6 border-t border-stone-100">
-            <button onClick={() => signInAnonymously(auth)} className="text-[10px] font-black text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors">
-              Kontynuuj bez logowania (Tymczasowo)
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -1004,9 +999,86 @@ const App = () => {
                    })}
                  </div>
                </div>
+             </div>
+
+             {/* PRAWY PANEL - WYBRANE ELEMENTY DO PROJEKTU */}
+             <div className="w-full lg:w-2/5 flex flex-col gap-6">
+               
+               {/* Podsumowanie Okuć w Projekcie */}
+               <div className="bg-stone-100 p-6 rounded-3xl border border-stone-200">
+                 <h2 className="text-sm font-black text-stone-800 mb-4 flex justify-between items-center uppercase tracking-tight">
+                   Wybrane Okucia <span className="bg-stone-800 text-white px-3 py-1 rounded-xl text-xs shadow-sm">{hardwareTotalSum.toLocaleString()} zł</span>
+                 </h2>
+                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                   {hardwareItems.map(item => (
+                     <div key={item.id} className="bg-white p-3 rounded-2xl flex justify-between items-center shadow-sm border border-stone-200">
+                       <div className="flex gap-3 items-center flex-1 pr-2">
+                         {item.imageUrl ? (
+                           <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-md object-cover border border-stone-200" />
+                         ) : (
+                           <div className="w-8 h-8 rounded-md bg-stone-50 flex items-center justify-center text-stone-300 border border-stone-200">
+                             <Wrench size={14} />
+                           </div>
+                         )}
+                         <div>
+                           <p className="text-[8px] font-bold text-stone-400 uppercase mb-0.5">{item.category}</p>
+                           <h4 className="font-bold text-xs text-stone-800 leading-tight">
+                             {item.linkUrl ? (
+                               <a href={item.linkUrl} target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 hover:underline flex items-center gap-1">
+                                 {item.name}
+                               </a>
+                             ) : item.name}
+                           </h4>
+                           <div className="text-stone-800 font-black text-xs mt-0.5">{(item.quantity * item.unitPrice).toLocaleString()} zł</div>
+                         </div>
+                       </div>
+                       <div className="flex items-center gap-1 bg-stone-50 p-1 rounded-xl border border-stone-200">
+                         <button onClick={() => setHardwareItems(hardwareItems.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="p-1 bg-white text-stone-500 rounded-lg hover:text-stone-800"><Minus size={12}/></button>
+                         <span className="text-xs font-black w-6 text-center text-stone-800">{item.quantity}</span>
+                         <button onClick={() => setHardwareItems(hardwareItems.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i))} className="p-1 bg-white text-stone-500 rounded-lg hover:text-stone-800"><Plus size={12}/></button>
+                         <button onClick={() => setHardwareItems(hardwareItems.filter(i => i.id !== item.id))} className="text-stone-300 hover:text-red-500 ml-1 p-1"><X size={14}/></button>
+                       </div>
+                     </div>
+                   ))}
+                   {hardwareItems.length === 0 && <div className="text-center py-6 bg-white border-2 border-dashed border-stone-200 rounded-2xl text-[10px] font-bold text-stone-400 uppercase tracking-widest">Brak okuć</div>}
+                 </div>
+               </div>
+
+               {/* Podsumowanie Materiałów w Projekcie */}
+               <div className="bg-stone-100 p-6 rounded-3xl border border-stone-200">
+                 <h2 className="text-sm font-black text-stone-800 mb-4 flex justify-between items-center uppercase tracking-tight">
+                   Wybrane Materiały <span className="bg-stone-800 text-white px-3 py-1 rounded-xl text-xs shadow-sm">{projectMaterials.length} szt.</span>
+                 </h2>
+                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                   {projectMaterials.map(item => (
+                     <div key={item.globalId} className="bg-white p-3 rounded-2xl flex justify-between items-center shadow-sm border border-stone-200">
+                       <div className="flex gap-3 items-center flex-1">
+                         {item.imageUrl ? (
+                           <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-md object-cover border border-stone-200" />
+                         ) : (
+                           <div className="w-8 h-8 rounded-md bg-stone-50 flex items-center justify-center text-stone-300 border border-stone-200">
+                             <ImageIcon size={14} />
+                           </div>
+                         )}
+                         <div>
+                           <p className="text-[8px] font-bold text-stone-400 uppercase mb-0.5">{item.category}</p>
+                           <h4 className="font-bold text-xs text-stone-800 leading-tight">
+                             {item.linkUrl ? (
+                               <a href={item.linkUrl} target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 hover:underline flex items-center gap-1">
+                                 {item.name}
+                               </a>
+                             ) : item.name}
+                           </h4>
+                         </div>
+                       </div>
+                       <button onClick={() => setProjectMaterials(projectMaterials.filter(i => i.globalId !== item.globalId))} className="text-stone-300 hover:text-red-500 p-2"><X size={16}/></button>
+                     </div>
+                   ))}
+                   {projectMaterials.length === 0 && <div className="text-center py-6 bg-white border-2 border-dashed border-stone-200 rounded-2xl text-[10px] font-bold text-stone-400 uppercase tracking-widest">Brak materiałów</div>}
+                 </div>
+               </div>
 
              </div>
-             <button onClick={saveSettingsToCloud} className="w-full py-5 mt-6 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all">Zapisz ustawienia</button>
           </div>
         )}
 
@@ -1063,7 +1135,7 @@ const App = () => {
                {cloudProjects.length === 0 && (
                  <div className="col-span-full py-20 text-center flex flex-col items-center">
                    <div className="bg-white p-6 rounded-full shadow-sm border border-stone-200 mb-4"><FolderOpen size={48} className="text-stone-300"/></div>
-                   <h3 className="font-black text-stone-400 text-lg">Brak zapisanych projektów</h3>
+                   <h3 className="font-black text-stone-400 text-lg">Brak zapisanych projects</h3>
                  </div>
                )}
              </div>
