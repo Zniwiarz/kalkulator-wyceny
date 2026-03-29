@@ -24,7 +24,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'stolarnia-master-calc-prod';
+const appId = 'stolarnia-master-calc-prod'; // Pozostawiam ID bazy bez zmian, by nie utracić danych
 
 // Domyślne ustawienia i mnożniki
 const defaultSettings = {
@@ -210,7 +210,7 @@ const App = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `MasterCalc_Backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `ToSieDotnie_Backup_${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -664,8 +664,8 @@ const App = () => {
               </div>
             </div>
 
-            <div className="mt-16 pt-6 border-t border-stone-100 text-center">
-              <p className="text-[9px] font-bold text-stone-300 uppercase tracking-[0.3em]">Dokument wygenerowany z Master Calc</p>
+            <div className="mt-16 pt-6 border-t border-stone-100 flex flex-col items-center justify-center">
+              <img src="obraz.png" alt="To się dotnie" className="h-12 object-contain grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all" />
             </div>
           </div>
         </div>
@@ -682,7 +682,7 @@ const App = () => {
           <div className="bg-stone-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner border border-stone-700">
             <Calculator className="text-white" size={40} />
           </div>
-          <h1 className="text-3xl font-black text-stone-900 tracking-tight mb-3">Master Calc</h1>
+          <h1 className="text-3xl font-black text-stone-900 tracking-tight mb-3">To się dotnie</h1>
           <p className="text-sm font-bold text-stone-500 mb-10 leading-relaxed">
             Zaloguj się, aby zsynchronizować swoje wyceny, materiały i okucia w chmurze i mieć do nich stały dostęp z każdego urządzenia.
           </p>
@@ -714,7 +714,7 @@ const App = () => {
           <div className="bg-stone-800 p-1.5 rounded-lg shadow-sm">
             <Calculator className="text-white w-5 h-5" />
           </div>
-          <h1 className="text-lg font-black tracking-tight text-stone-800 hidden md:block">Master Calc</h1>
+          <h1 className="text-lg font-black tracking-tight text-stone-800 hidden md:block">To się dotnie</h1>
         </div>
         
         <div className="flex flex-wrap bg-stone-100 p-1 rounded-xl gap-1 overflow-x-auto no-scrollbar">
@@ -1545,8 +1545,8 @@ const App = () => {
                     </div>
                   </div>
 
-                  <div className="mt-16 pt-6 border-t border-stone-100 text-center">
-                    <p className="text-[9px] font-bold text-stone-300 uppercase tracking-[0.3em]">Dokument wygenerowany z Master Calc</p>
+                  <div className="mt-16 pt-6 border-t border-stone-100 flex flex-col items-center justify-center">
+                    <img src="obraz.png" alt="To się dotnie" className="h-12 object-contain grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all" />
                   </div>
 
                </div>
@@ -1909,7 +1909,7 @@ const App = () => {
               {alertDialog.message}
             </div>
             <button onClick={() => setAlertDialog({ isOpen: false, title: '', message: '' })} className="w-full py-3.5 bg-stone-800 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md hover:bg-stone-900 transition-colors">
-              Zrozumiałam
+              Zrozumiałem
             </button>
           </div>
         </div>
