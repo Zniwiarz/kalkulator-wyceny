@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, addDoc, getDoc, onSnapshot, deleteDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, addDoc, getDoc, onSnapshot, deleteDoc, serverTimestamp, updateDoc, setDoc } from 'firebase/firestore';
 import { 
   Plus, Settings, Trash2, Copy, Save, Calculator, Truck, Edit2, 
   FolderOpen, X, FilePlus, Layers, Layout, Scissors, Ruler, Palette, 
@@ -158,11 +158,16 @@ const App = () => {
   useEffect(() => {
     if (!user || isSharedView) return;
 
-    const unsubProj = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'projects'), (snap) => setCloudProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
-    const unsubHw = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'hardware_db'), (snap) => setGlobalHardwareDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
-    const unsubMat = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'materials_db'), (snap) => setGlobalMaterialsDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
+    const unsubProj = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), (snap) => setCloudProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
+    const unsubHw = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'hardware_db'), (snap) => setGlobalHardwareDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
+    const unsubMat = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'materials_db'), (snap) => setGlobalMaterialsDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
+    const unsubSettings = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'global_config', 'settings'), (docSnap) => {
+      if (docSnap.exists()) {
+        setBaseSettings(prev => ({...prev, ...docSnap.data()}));
+      }
+    }, (error) => console.error(error));
     
-    return () => { unsubProj(); unsubHw(); unsubMat(); };
+    return () => { unsubProj(); unsubHw(); unsubMat(); unsubSettings(); };
   }, [user, isSharedView]);
 
   useEffect(() => {
@@ -221,7 +226,7 @@ const App = () => {
               if (!items || !items.length) return;
               for (const item of items) {
                 const { id, ...rest } = item;
-                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, collectionName), rest);
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), rest);
               }
             };
 
@@ -337,6 +342,26 @@ const App = () => {
     resetBuilder();
   };
 
+  const saveSettingsToCloud = async () => {
+    if (!user) {
+      setActiveTab('summary');
+      return;
+    }
+    try {
+      const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_config', 'settings');
+      const snap = await getDoc(settingsRef);
+      if (snap.exists()) {
+        await updateDoc(settingsRef, baseSettings);
+      } else {
+        await setDoc(settingsRef, baseSettings);
+      }
+      setActiveTab('summary');
+    } catch (e) {
+      console.error("Błąd zapisu ustawień:", e);
+      setActiveTab('summary');
+    }
+  };
+
   const saveProjectToCloud = async (overwrite = false) => {
     if (!user) {
       alert("Błąd zapisu! Brak połączenia z bazą.");
@@ -344,8 +369,8 @@ const App = () => {
     }
     try {
       const data = { name: currentProjectName, items: quoteItems, hardware: hardwareItems, materials: projectMaterials, wholesale: wholesaleExtraCost, services: extraServices, settings: baseSettings, globalCalcMaterials, globalFrontType, updatedAt: serverTimestamp() };
-      if (overwrite && currentProjectId) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'projects', currentProjectId), data);
-      else setCurrentProjectId((await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'projects'), data)).id);
+      if (overwrite && currentProjectId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', currentProjectId), data);
+      else setCurrentProjectId((await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), data)).id);
       setShowSaveModal(false);
     } catch (e) { 
       console.error("Błąd zapisu projektu:", e); 
@@ -894,7 +919,7 @@ const App = () => {
                            <p className="text-[9px] uppercase font-black text-stone-600 tracking-widest bg-stone-100 px-2 py-1 rounded-md">{hw.category}</p>
                            <div className="flex gap-2">
                              <button onClick={() => handleEditHardware(hw)} className="text-stone-300 hover:text-stone-800 opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>
-                             <button onClick={() => requestConfirm("Usuń okucie", `Usunąć ${hw.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'hardware_db', hw.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
+                             <button onClick={() => requestConfirm("Usuń okucie", `Usunąć ${hw.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'hardware_db', hw.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
                            </div>
                          </div>
                          <div className="flex gap-3 items-center">
@@ -945,7 +970,7 @@ const App = () => {
                              <p className="text-[9px] uppercase font-black text-stone-600 tracking-widest bg-stone-100 px-2 py-1 rounded-md">{mat.category}</p>
                              <div className="flex gap-2">
                                <button onClick={() => handleEditMaterial(mat)} className="text-stone-300 hover:text-stone-800 opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>
-                               <button onClick={() => requestConfirm("Usuń materiał", `Usunąć ${mat.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'materials_db', mat.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
+                               <button onClick={() => requestConfirm("Usuń materiał", `Usunąć ${mat.name} z bazy?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials_db', mat.id)))} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16}/></button>
                              </div>
                            </div>
                            <div className="flex gap-3 items-center">
@@ -981,137 +1006,7 @@ const App = () => {
                </div>
 
              </div>
-             
-             {/* PRAWY PANEL - WYBRANE ELEMENTY */}
-             <div className="w-full lg:w-2/5 flex flex-col gap-6">
-               
-               {/* Podsumowanie Okuć */}
-               <div className="bg-stone-100 p-6 rounded-3xl border border-stone-200">
-                 <h2 className="text-sm font-black text-stone-800 mb-4 flex justify-between items-center uppercase tracking-tight">
-                   Wybrane Okucia <span className="bg-stone-800 text-white px-3 py-1 rounded-xl text-xs shadow-sm">{hardwareTotalSum.toLocaleString()} zł</span>
-                 </h2>
-                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                   {hardwareItems.map(item => (
-                     <div key={item.id} className="bg-white p-3 rounded-2xl flex justify-between items-center shadow-sm border border-stone-200">
-                       <div className="flex gap-3 items-center flex-1 pr-2">
-                         {item.imageUrl ? (
-                           <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-md object-cover border border-stone-200" />
-                         ) : (
-                           <div className="w-8 h-8 rounded-md bg-stone-50 flex items-center justify-center text-stone-300 border border-stone-200">
-                             <Wrench size={14} />
-                           </div>
-                         )}
-                         <div>
-                           <p className="text-[8px] font-bold text-stone-400 uppercase mb-0.5">{item.category}</p>
-                           <h4 className="font-bold text-xs text-stone-800 leading-tight">
-                             {item.linkUrl ? (
-                               <a href={item.linkUrl} target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 hover:underline flex items-center gap-1">
-                                 {item.name}
-                               </a>
-                             ) : item.name}
-                           </h4>
-                           <div className="text-stone-800 font-black text-xs mt-0.5">{(item.quantity * item.unitPrice).toLocaleString()} zł</div>
-                         </div>
-                       </div>
-                       <div className="flex items-center gap-1 bg-stone-50 p-1 rounded-xl border border-stone-200">
-                         <button onClick={() => setHardwareItems(hardwareItems.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="p-1 bg-white text-stone-500 rounded-lg hover:text-stone-800"><Minus size={12}/></button>
-                         <span className="text-xs font-black w-6 text-center text-stone-800">{item.quantity}</span>
-                         <button onClick={() => setHardwareItems(hardwareItems.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i))} className="p-1 bg-white text-stone-500 rounded-lg hover:text-stone-800"><Plus size={12}/></button>
-                         <button onClick={() => setHardwareItems(hardwareItems.filter(i => i.id !== item.id))} className="text-stone-300 hover:text-red-500 ml-1 p-1"><X size={14}/></button>
-                       </div>
-                     </div>
-                   ))}
-                   {hardwareItems.length === 0 && <div className="text-center py-6 bg-white border-2 border-dashed border-stone-200 rounded-2xl text-[10px] font-bold text-stone-400 uppercase tracking-widest">Brak okuć</div>}
-                 </div>
-               </div>
-
-               {/* Podsumowanie Materiałów */}
-               <div className="bg-stone-100 p-6 rounded-3xl border border-stone-200">
-                 <h2 className="text-sm font-black text-stone-800 mb-4 flex justify-between items-center uppercase tracking-tight">
-                   Wybrane Materiały <span className="bg-stone-800 text-white px-3 py-1 rounded-xl text-xs shadow-sm">{projectMaterials.length} szt.</span>
-                 </h2>
-                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                   {projectMaterials.map(item => (
-                     <div key={item.globalId} className="bg-white p-3 rounded-2xl flex justify-between items-center shadow-sm border border-stone-200">
-                       <div className="flex gap-3 items-center flex-1">
-                         {item.imageUrl ? (
-                           <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-md object-cover border border-stone-200" />
-                         ) : (
-                           <div className="w-8 h-8 rounded-md bg-stone-50 flex items-center justify-center text-stone-300 border border-stone-200">
-                             <ImageIcon size={14} />
-                           </div>
-                         )}
-                         <div>
-                           <p className="text-[8px] font-bold text-stone-400 uppercase mb-0.5">{item.category}</p>
-                           <h4 className="font-bold text-xs text-stone-800 leading-tight">
-                             {item.linkUrl ? (
-                               <a href={item.linkUrl} target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 hover:underline flex items-center gap-1">
-                                 {item.name}
-                               </a>
-                             ) : item.name}
-                           </h4>
-                         </div>
-                       </div>
-                       <button onClick={() => setProjectMaterials(projectMaterials.filter(i => i.globalId !== item.globalId))} className="text-stone-300 hover:text-red-500 p-2"><X size={16}/></button>
-                     </div>
-                   ))}
-                   {projectMaterials.length === 0 && <div className="text-center py-6 bg-white border-2 border-dashed border-stone-200 rounded-2xl text-[10px] font-bold text-stone-400 uppercase tracking-widest">Brak materiałów</div>}
-                 </div>
-               </div>
-
-             </div>
-          </div>
-        )}
-
-        {/* --- 4. ZAKŁADKA CENNIK --- */}
-        {activeTab === 'settings' && (
-          <div className="max-w-3xl mx-auto bg-white p-8 sm:p-12 rounded-[40px] border border-stone-200 shadow-xl space-y-8 animate-in zoom-in-95">
-             <div className="text-center">
-               <div className="bg-stone-100 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"><Settings className="text-stone-800" size={32}/></div>
-               <h2 className="text-3xl font-black text-stone-800 tracking-tight">Cennik i Ustawienia</h2>
-             </div>
-             
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-stone-100">
-               <div className="sm:col-span-2 bg-stone-50 p-6 rounded-3xl border border-stone-200">
-                 <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 mb-4">Robocizna i Czas</h3>
-                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                   <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-2">Czas (h/szafkę)</label><input type="number" className="w-full p-4 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.baseHoursPerItem} onChange={e => setBaseSettings({...baseSettings, baseHoursPerItem: Number(e.target.value)})} /></div>
-                   <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest block mb-2">Stawka (zł/h)</label><input type="number" className="w-full p-4 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.laborRate} onChange={e => setBaseSettings({...baseSettings, laborRate: Number(e.target.value)})} /></div>
-                   <div><label className="text-[10px] font-bold text-green-600 uppercase tracking-widest block mb-2">Rabat (%)</label><input type="number" className="w-full p-4 bg-green-50 text-green-700 border border-green-200 rounded-xl font-black outline-none focus:ring-2 focus:ring-green-300" value={baseSettings.laborDiscount} onChange={e => setBaseSettings({...baseSettings, laborDiscount: Number(e.target.value)})} /></div>
-                 </div>
-               </div>
-               <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                 <div className="space-y-4"><h3 className="text-xs font-black uppercase tracking-widest text-amber-700 border-b border-stone-200 pb-2">Materiały i Usługi</h3>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Cena blatu <span>zł/mb</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-100 text-stone-900 rounded-xl font-black border border-stone-300" value={baseSettings.countertopPriceMb} onChange={e => setBaseSettings({...baseSettings, countertopPriceMb: Number(e.target.value)})} /></div>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Płyta korp. <span>zł/m²</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.platePriceM2} onChange={e => setBaseSettings({...baseSettings, platePriceM2: Number(e.target.value)})} /></div>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Cięcie <span>zł/mb</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.cuttingPriceMb} onChange={e => setBaseSettings({...baseSettings, cuttingPriceMb: Number(e.target.value)})} /></div>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Oklejanie <span>zł/mb</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.edgingPriceMb} onChange={e => setBaseSettings({...baseSettings, edgingPriceMb: Number(e.target.value)})} /></div>
-                 </div>
-                 <div className="space-y-4"><h3 className="text-xs font-black uppercase tracking-widest text-stone-600 border-b border-stone-200 pb-2">Ceny frontów</h3>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Standard <span>zł/m²</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.frontStandardPriceM2} onChange={e => setBaseSettings({...baseSettings, frontStandardPriceM2: Number(e.target.value)})} /></div>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Lakier Mat <span>zł/m²</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.frontMatPriceM2} onChange={e => setBaseSettings({...baseSettings, frontMatPriceM2: Number(e.target.value)})} /></div>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Lakier Połysk <span>zł/m²</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.frontLakierPriceM2} onChange={e => setBaseSettings({...baseSettings, frontLakierPriceM2: Number(e.target.value)})} /></div>
-                    <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Ryflowany <span>zł/m²</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.frontRyflowanyPriceM2} onChange={e => setBaseSettings({...baseSettings, frontRyflowanyPriceM2: Number(e.target.value)})} /></div>
-                 </div>
-               </div>
-               
-               {/* NOWA SEKCJA: KOPIA ZAPASOWA */}
-               <div className="sm:col-span-2 bg-stone-900 text-white p-6 rounded-3xl border border-stone-800 flex flex-col sm:flex-row justify-between items-center gap-6 mt-4">
-                 <div>
-                   <h3 className="text-lg font-black tracking-tight mb-1 flex items-center gap-2"><Save size={18} className="text-stone-400"/> Kopia Zapasowa</h3>
-                   <p className="text-xs text-stone-400 font-medium max-w-sm">Zabezpiecz swoje okucia, materiały, wyceny i ustawienia na dysku, lub przenieś je na inne konto z powrotem do aplikacji.</p>
-                 </div>
-                 <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-                   <button onClick={handleExportBackup} className="flex-1 sm:flex-none px-4 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border border-stone-700"><Download size={16}/> Pobierz</button>
-                   <label className="flex-1 sm:flex-none px-4 py-3 bg-white text-stone-900 hover:bg-stone-100 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm">
-                     <Upload size={16}/> Wgraj
-                     <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
-                   </label>
-                 </div>
-               </div>
-
-             </div>
-             <button onClick={() => setActiveTab('summary')} className="w-full py-5 mt-6 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all">Zapisz ustawienia</button>
+             <button onClick={saveSettingsToCloud} className="w-full py-5 mt-6 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all">Zapisz ustawienia</button>
           </div>
         )}
 
@@ -1139,7 +1034,7 @@ const App = () => {
                  <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Dodatek za 1 szufladę</label><input type="number" step="0.01" className="w-full mt-1.5 p-3 bg-white rounded-xl font-black text-stone-800 border border-stone-200 outline-none focus:ring-2 focus:ring-stone-200" value={baseSettings.multStandingSzufladyPerDrawer ?? 0.05} onChange={e => setBaseSettings({...baseSettings, multStandingSzufladyPerDrawer: Number(e.target.value)})} /></div>
                </div>
              </div>
-             <button onClick={() => setActiveTab('summary')} className="w-full py-5 mt-6 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all">Zapisz ustawienia</button>
+             <button onClick={saveSettingsToCloud} className="w-full py-5 mt-6 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all">Zapisz ustawienia</button>
           </div>
         )}
 
@@ -1157,7 +1052,7 @@ const App = () => {
                    <div>
                      <div className="flex justify-between items-start mb-4">
                        <div className="bg-stone-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase text-stone-800 tracking-widest">Projekt zapisany</div>
-                       <button onClick={() => requestConfirm("Usuń Projekt", `Czy usunąć bezpowrotnie wycenę ${proj.name}?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'projects', proj.id)))} className="text-stone-300 hover:text-red-500 bg-stone-50 hover:bg-red-50 p-2 rounded-xl transition-colors"><Trash2 size={16}/></button>
+                       <button onClick={() => requestConfirm("Usuń Projekt", `Czy usunąć bezpowrotnie wycenę ${proj.name}?`, async () => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', proj.id)))} className="text-stone-300 hover:text-red-500 bg-stone-50 hover:bg-red-50 p-2 rounded-xl transition-colors"><Trash2 size={16}/></button>
                      </div>
                      <h3 className="font-black text-xl text-stone-800 leading-tight">{proj.name}</h3>
                      <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-2">Elementów: {proj.items?.length || 0}</p>
@@ -1648,9 +1543,9 @@ const App = () => {
               <button onClick={async () => { 
                 if (!user || !newGlobalHardware.name) return; 
                 if (editingHardwareId) {
-                  await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'hardware_db', editingHardwareId), { ...newGlobalHardware });
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'hardware_db', editingHardwareId), { ...newGlobalHardware });
                 } else {
-                  await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'hardware_db'), { ...newGlobalHardware, createdAt: serverTimestamp() });
+                  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'hardware_db'), { ...newGlobalHardware, createdAt: serverTimestamp() });
                 }
                 setShowAddGlobalModal(false); 
                 setEditingHardwareId(null);
@@ -1688,9 +1583,9 @@ const App = () => {
               <button onClick={async () => { 
                 if (!user || !newMaterial.name) return; 
                 if (editingMaterialId) {
-                  await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'materials_db', editingMaterialId), { ...newMaterial });
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials_db', editingMaterialId), { ...newMaterial });
                 } else {
-                  await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'materials_db'), { ...newMaterial, createdAt: serverTimestamp() });
+                  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'materials_db'), { ...newMaterial, createdAt: serverTimestamp() });
                 }
                 setShowAddMaterialModal(false); 
                 setEditingMaterialId(null);
