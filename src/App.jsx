@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, doc, addDoc, getDoc, onSnapshot, deleteDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { 
   Plus, Settings, Trash2, Copy, Save, Calculator, Truck, Edit2, 
   FolderOpen, X, FilePlus, Layers, Layout, Scissors, Ruler, Palette, 
   ArrowUpToLine, ArrowDownToLine, FileText, Wrench, Search, Minus,
   CheckSquare, Square, CheckCircle2, Link as LinkIcon, Loader2, ClipboardList,
-  Package, Image as ImageIcon, ExternalLink, Sliders
+  Package, Image as ImageIcon, ExternalLink, Sliders,
+  Download, Upload, LogOut, User, AlertTriangle
 } from 'lucide-react';
 
 // TWOJA KONFIGURACJA FIREBASE
@@ -41,7 +42,7 @@ const defaultSettings = {
 const App = () => {
   // --- STANY APLIKACJI ---
   const [activeTab, setActiveTab] = useState('summary'); 
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(undefined); // undefined oznacza ładowanie
   
   // Współdzielony widok klienta
   const [isSharedView, setIsSharedView] = useState(false);
@@ -85,7 +86,7 @@ const App = () => {
   const [editingMaterialId, setEditingMaterialId] = useState(null);
   
   // Stany oferty i kreatora
-  const [offerConfig, setOfferConfig] = useState({ clientName: '', estimatedDelivery: '', includeHardware: true, includeMaterials: true, includeDetailedPrices: true, selectedItems: {}, countertopStandardLength: 4100, notes: '' });
+  const [offerConfig, setOfferConfig] = useState({ clientName: '', estimatedDelivery: '', includeHardware: true, includeMaterials: true, includeDetailedPrices: true, includeServices: true, selectedItems: {}, countertopStandardLength: 4100, notes: '' });
   const [builderStep, setBuilderStep] = useState(1);
   const [currentFurniture, setCurrentFurniture] = useState({ 
     category: 'hanging', name: '', type: 'prosty', drawerCount: 1, 
@@ -122,18 +123,14 @@ const App = () => {
 
   // --- EFEKTY (FIREBASE & URL) ---
   useEffect(() => {
-    // Autoryzacja Anonimowa działa w tle
-    signInAnonymously(auth).catch((err) => console.error("Błąd logowania anonimowego:", err));
-    return onAuthStateChanged(auth, setUser);
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
     const urlParams = new URLSearchParams(window.location.search);
     const offerId = urlParams.get('offer');
-    
+
     if (offerId) {
       setIsSharedView(true);
+      // Klient logowany anonimowo w tle (dla stabilności odczytów Firebase)
+      signInAnonymously(auth).catch(console.error);
+      
       const fetchPublicOffer = async () => {
         try {
           const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_offers', offerId);
@@ -149,15 +146,24 @@ const App = () => {
         }
       };
       fetchPublicOffer();
-      return; 
     }
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser || null); // Jeśli brak usera, ustawiamy na czysty null (kończymy ładowanie)
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user || isSharedView) return;
 
     const unsubProj = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'projects'), (snap) => setCloudProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
     const unsubHw = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'hardware_db'), (snap) => setGlobalHardwareDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
     const unsubMat = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'materials_db'), (snap) => setGlobalMaterialsDb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.error(error));
     
     return () => { unsubProj(); unsubHw(); unsubMat(); };
-  }, [user]);
+  }, [user, isSharedView]);
 
   useEffect(() => {
     setOfferConfig(prev => {
@@ -167,11 +173,78 @@ const App = () => {
     });
   }, [quoteItems]);
 
+  // --- LOGIKA LOGOWANIA ---
+  const handleGoogleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Błąd logowania:", error);
+      alert("Nie udało się zalogować: " + error.message);
+    }
+  };
+
+  // --- LOGIKA KOPII ZAPASOWEJ ---
+  const handleExportBackup = () => {
+    const data = {
+      settings: baseSettings,
+      hardware: globalHardwareDb,
+      materials: globalMaterialsDb,
+      projects: cloudProjects
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MasterCalc_Backup_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBackup = (e) => {
+    const file = e.target.files[0];
+    if (!file || !user) return;
+    
+    requestConfirm(
+      "Wgrywanie kopii zapasowej", 
+      "Dane z pliku zostaną dodane do Twojej obecnej bazy. Czy chcesz kontynuować?", 
+      () => {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            if (data.settings) setBaseSettings({...defaultSettings, ...data.settings});
+            
+            const batchAdd = async (collectionName, items) => {
+              if (!items || !items.length) return;
+              for (const item of items) {
+                const { id, ...rest } = item;
+                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, collectionName), rest);
+              }
+            };
+
+            await batchAdd('hardware_db', data.hardware);
+            await batchAdd('materials_db', data.materials);
+            await batchAdd('projects', data.projects);
+            
+            alert("Baza wczytana pomyślnie! Zamknij ten komunikat, aby zobaczyć zmiany.");
+            e.target.value = ''; // Zresetuj input pliku
+          } catch (err) {
+            alert("Błąd importu: Uszkodzony plik lub problem z bazą.");
+          }
+        };
+        reader.readAsText(file);
+      }
+    );
+  };
+
   // --- LOGIKA KALKULACJI ---
   const calculateItemMetrics = useCallback((item, settings, isGlobalMaterialCalc, frontType) => {
     let hours = settings.baseHoursPerItem || 4;
     let multiplier = 1.0;
-    const qty = item.quantity || 1; // Ilość, głównie dla formatek
+    const qty = item.quantity || 1; 
     
     const mHP = settings.multHangingProsty ?? 1.2;
     const mHS = settings.multHangingSkomplik ?? 1.4;
@@ -187,7 +260,7 @@ const App = () => {
     } else if (item.category === 'blat') {
       hours = (settings.baseHoursPerItem || 4) * 0.2; 
     } else if (item.category === 'formatka') {
-      hours = (settings.baseHoursPerItem || 4) * 0.1 * qty; // Czas dla formatek mnożony przez ilość
+      hours = (settings.baseHoursPerItem || 4) * 0.1 * qty; 
     }
     
     hours *= multiplier;
@@ -204,12 +277,12 @@ const App = () => {
        if (isGlobalMaterialCalc) materialCost = Math.round(countertopMb * (settings.countertopPriceMb || 150));
     } 
     else if (item.category === 'formatka' && W && H) {
-       const area = W * H * qty; // Powierzchnia formatek mnożona przez ilość
+       const area = W * H * qty; 
        if (item.boardMaterial === 'front') frontM2 = area;
        else plateM2 = area;
 
-       if (item.isEdged) totalEdging = (W + H) * 2 * qty; // Krawędzie mnożone przez ilość
-       totalCutting = (W + H) * 2 * qty; // Cięcie mnożone przez ilość
+       if (item.isEdged) totalEdging = (W + H) * 2 * qty; 
+       totalCutting = (W + H) * 2 * qty; 
 
        let formatkaFrontPrice = frontType === 'mat' ? settings.frontMatPriceM2 : frontType === 'lakier' ? settings.frontLakierPriceM2 : frontType === 'ryflowany' ? settings.frontRyflowanyPriceM2 : settings.frontStandardPriceM2;
 
@@ -250,16 +323,6 @@ const App = () => {
   const rawFinalProjectTotal = furnitureTotalSum + hardwareTotalSum + Number(wholesaleExtraCost || 0) + servicesTotalSum;
   const finalProjectTotal = Math.ceil(rawFinalProjectTotal / 10) * 10;
   
-  const finalSplit = useMemo(() => {
-    const itemRawLabor = calculatedQuoteItems.reduce((acc, i) => acc + i.rawLabor, 0);
-    const sRaw = (extraServices.okap ? baseSettings.priceOkap : 0) + (extraServices.zlew ? baseSettings.priceZlew : 0) + (extraServices.plata ? baseSettings.pricePlata : 0) + Number(extraServices.customValue || 0);
-    return {
-      totalLabor: calculatedQuoteItems.reduce((acc, i) => acc + i.laborCost, 0) + servicesTotalSum,
-      totalMaterials: calculatedQuoteItems.reduce((acc, i) => acc + i.materialCost, 0) + hardwareTotalSum + Number(wholesaleExtraCost || 0),
-      discountAmount: Math.round((itemRawLabor + sRaw) * (baseSettings.laborDiscount / 100))
-    };
-  }, [calculatedQuoteItems, hardwareTotalSum, servicesTotalSum, extraServices, wholesaleExtraCost, baseSettings]);
-
   const offerItems = useMemo(() => calculatedQuoteItems.filter(item => offerConfig.selectedItems[item.id]), [calculatedQuoteItems, offerConfig.selectedItems]);
   const rawOfferTotal = offerItems.reduce((acc, item) => acc + item.totalPrice, 0) + servicesTotalSum + Number(wholesaleExtraCost || 0) + (offerConfig.includeHardware ? hardwareTotalSum : 0);
   const offerTotal = Math.ceil(rawOfferTotal / 10) * 10;
@@ -276,7 +339,7 @@ const App = () => {
 
   const saveProjectToCloud = async (overwrite = false) => {
     if (!user) {
-      alert("Błąd zapisu! Brak połączenia z bazą (autoryzacja nieudana).");
+      alert("Błąd zapisu! Brak połączenia z bazą.");
       return;
     }
     try {
@@ -430,7 +493,7 @@ const App = () => {
       );
     }
 
-    const { projectName, clientName, estimatedDelivery, items, hardware, materials, includeHardware, includeServices, includeMaterials, includeDetailedPrices = true, servicesTotal, hardwareTotal, furnitureTotal, offerTotal, dateStr, countertopStandardLength, notes } = sharedOfferData;
+    const { projectName, clientName, estimatedDelivery, items, hardware, materials, includeHardware, includeMaterials, includeDetailedPrices = true, offerTotal, dateStr, countertopStandardLength, notes } = sharedOfferData;
     const totalCountertopMb = items.reduce((acc, item) => item.category === 'blat' ? acc + (item.raw?.countertopMb || 0) : acc, 0);
 
     return (
@@ -485,7 +548,7 @@ const App = () => {
               </table>
             </div>
 
-            {/* Podsumowanie blatów (jeśli są) */}
+            {/* Podsumowanie blatów */}
             {totalCountertopMb > 0 && (
               <div className="mb-10 page-break-inside-avoid">
                 <h3 className="text-sm font-black text-stone-800 uppercase tracking-widest mb-4 border-l-4 border-stone-800 pl-3">Zestawienie Blatów Roboczych</h3>
@@ -561,7 +624,7 @@ const App = () => {
               <div className="w-full md:w-2/3 bg-stone-50 p-6 rounded-2xl">
                 <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4 text-right">Podsumowanie Kosztów</h3>
                 <div className="pt-2 flex flex-col items-end">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Całkowity koszt inwestycji</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Szacowany koszt inwestycji</span>
                   <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-stone-900">{offerTotal.toLocaleString()}</span><span className="text-xl font-bold text-stone-500">PLN</span></div>
                 </div>
               </div>
@@ -576,10 +639,39 @@ const App = () => {
     );
   }
 
+  // --- WIDOK LOGOWANIA (Tylko dla nieudostępnionych widoków) ---
+  if (user === null && !isSharedView) {
+    return (
+      <div className="min-h-screen bg-[#F4F1EA] flex flex-col items-center justify-center p-4">
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Poiret+One&display=swap');`}</style>
+        <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full text-center border border-stone-200">
+          <div className="bg-stone-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner border border-stone-700">
+            <Calculator className="text-white" size={40} />
+          </div>
+          <h1 className="text-3xl font-black text-stone-900 tracking-tight mb-3">Master Calc</h1>
+          <p className="text-sm font-bold text-stone-500 mb-10 leading-relaxed">
+            Zaloguj się, aby zsynchronizować swoje wyceny, materiały i okucia w chmurze i mieć do nich stały dostęp z każdego urządzenia.
+          </p>
+          <button onClick={handleGoogleLogin} className="w-full bg-stone-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-300 hover:bg-stone-800 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3">
+            Zaloguj przez Google
+          </button>
+          <div className="mt-8 pt-6 border-t border-stone-100">
+            <button onClick={() => signInAnonymously(auth)} className="text-[10px] font-black text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors">
+              Kontynuuj bez logowania (Tymczasowo)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Nie renderuj głównej apki dopóki nie wiemy kim jest user (stan = undefined)
+  if (user === undefined && !isSharedView) return null;
+
   // --- WIDOK APLIKACJI GŁÓWNEJ ---
   const TabBtn = ({ id, label, icon: Icon }) => (
     <button onClick={() => setActiveTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex gap-1.5 items-center transition-colors ${activeTab === id ? 'bg-white shadow text-stone-800' : 'text-stone-500 hover:text-stone-800'}`}>
-      {Icon && <Icon size={14}/>} {label}
+      {Icon && <Icon size={14}/>} <span className="hidden sm:inline">{label}</span>
     </button>
   );
 
@@ -593,16 +685,41 @@ const App = () => {
           <div className="bg-stone-800 p-1.5 rounded-lg shadow-sm">
             <Calculator className="text-white w-5 h-5" />
           </div>
-          <h1 className="text-lg font-black tracking-tight text-stone-800">Master Calc</h1>
+          <h1 className="text-lg font-black tracking-tight text-stone-800 hidden md:block">Master Calc</h1>
         </div>
-        <div className="flex flex-wrap bg-stone-100 p-1 rounded-xl gap-1">
+        
+        <div className="flex flex-wrap bg-stone-100 p-1 rounded-xl gap-1 overflow-x-auto no-scrollbar">
           <TabBtn id="summary" label="Wycena" icon={ClipboardList} />
           <TabBtn id="materials" label="Formatki" icon={Layers} />
-          <TabBtn id="hardware" label="Okucia i materiały" icon={Wrench} />
+          <TabBtn id="hardware" label="Bazy danych" icon={Wrench} />
           <TabBtn id="projects" label="Archiwum" icon={FolderOpen} />
           <TabBtn id="settings" label="Cennik" icon={Settings} />
           <TabBtn id="multipliers" label="Mnożniki" icon={Sliders} />
           <TabBtn id="offer" label="Oferta" icon={FileText} />
+        </div>
+
+        {/* PROFIL UŻYTKOWNIKA */}
+        <div className="flex items-center gap-4">
+          {user?.isAnonymous ? (
+            <div className="flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-xl border border-amber-200">
+              <AlertTriangle size={14} />
+              <span className="text-[9px] font-black uppercase tracking-widest hidden lg:inline">Konto tymczasowe</span>
+              <button onClick={handleGoogleLogin} className="ml-2 text-[10px] bg-amber-600 text-white px-2 py-1 rounded shadow-sm hover:bg-amber-700 font-bold uppercase transition-colors">Zaloguj Google</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 bg-stone-50 pl-3 pr-1.5 py-1.5 rounded-full border border-stone-200">
+              <div className="text-right hidden lg:block mr-2">
+                <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest leading-none mb-1">Zalogowany</p>
+                <p className="text-[11px] font-black text-stone-700 leading-none">{user?.displayName?.split(' ')[0] || 'Użytkownik'}</p>
+              </div>
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="User" className="w-8 h-8 rounded-full border border-stone-300 shadow-sm"/>
+              ) : (
+                <div className="w-8 h-8 bg-stone-200 rounded-full flex items-center justify-center text-stone-500 shadow-sm"><User size={16}/></div>
+              )}
+              <button onClick={() => signOut(auth)} className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title="Wyloguj"><LogOut size={14}/></button>
+            </div>
+          )}
         </div>
       </nav>
 
@@ -948,11 +1065,12 @@ const App = () => {
 
         {/* --- 4. ZAKŁADKA CENNIK --- */}
         {activeTab === 'settings' && (
-          <div className="max-w-2xl mx-auto bg-white p-8 sm:p-12 rounded-[40px] border border-stone-200 shadow-xl space-y-8 animate-in zoom-in-95">
+          <div className="max-w-3xl mx-auto bg-white p-8 sm:p-12 rounded-[40px] border border-stone-200 shadow-xl space-y-8 animate-in zoom-in-95">
              <div className="text-center">
                <div className="bg-stone-100 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"><Settings className="text-stone-800" size={32}/></div>
-               <h2 className="text-3xl font-black text-stone-800 tracking-tight">Cennik Główny</h2>
+               <h2 className="text-3xl font-black text-stone-800 tracking-tight">Cennik i Ustawienia</h2>
              </div>
+             
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-stone-100">
                <div className="sm:col-span-2 bg-stone-50 p-6 rounded-3xl border border-stone-200">
                  <h3 className="text-xs font-black uppercase tracking-widest text-stone-800 mb-4">Robocizna i Czas</h3>
@@ -976,6 +1094,22 @@ const App = () => {
                     <div><label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex justify-between">Ryflowany <span>zł/m²</span></label><input type="number" className="w-full mt-1.5 p-3 bg-stone-50 rounded-xl font-bold border border-stone-200" value={baseSettings.frontRyflowanyPriceM2} onChange={e => setBaseSettings({...baseSettings, frontRyflowanyPriceM2: Number(e.target.value)})} /></div>
                  </div>
                </div>
+               
+               {/* NOWA SEKCJA: KOPIA ZAPASOWA */}
+               <div className="sm:col-span-2 bg-stone-900 text-white p-6 rounded-3xl border border-stone-800 flex flex-col sm:flex-row justify-between items-center gap-6 mt-4">
+                 <div>
+                   <h3 className="text-lg font-black tracking-tight mb-1 flex items-center gap-2"><Save size={18} className="text-stone-400"/> Kopia Zapasowa</h3>
+                   <p className="text-xs text-stone-400 font-medium max-w-sm">Zabezpiecz swoje okucia, materiały, wyceny i ustawienia na dysku, lub przenieś je na inne konto z powrotem do aplikacji.</p>
+                 </div>
+                 <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+                   <button onClick={handleExportBackup} className="flex-1 sm:flex-none px-4 py-3 bg-stone-800 hover:bg-stone-700 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors border border-stone-700"><Download size={16}/> Pobierz</button>
+                   <label className="flex-1 sm:flex-none px-4 py-3 bg-white text-stone-900 hover:bg-stone-100 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm">
+                     <Upload size={16}/> Wgraj
+                     <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
+                   </label>
+                 </div>
+               </div>
+
              </div>
              <button onClick={() => setActiveTab('summary')} className="w-full py-5 mt-6 bg-stone-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-stone-200 hover:bg-stone-900 transition-all">Zapisz ustawienia</button>
           </div>
@@ -1034,7 +1168,7 @@ const App = () => {
                {cloudProjects.length === 0 && (
                  <div className="col-span-full py-20 text-center flex flex-col items-center">
                    <div className="bg-white p-6 rounded-full shadow-sm border border-stone-200 mb-4"><FolderOpen size={48} className="text-stone-300"/></div>
-                   <h3 className="font-black text-stone-400 text-lg">Brak zapisanych projects</h3>
+                   <h3 className="font-black text-stone-400 text-lg">Brak zapisanych projektów</h3>
                  </div>
                )}
              </div>
@@ -1088,6 +1222,12 @@ const App = () => {
                       <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">Pokaż listę okuć</span>
                       <div className={`w-10 h-6 rounded-full relative transition-colors ${offerConfig.includeHardware ? 'bg-stone-800' : 'bg-stone-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${offerConfig.includeHardware ? 'left-5' : 'left-1'}`}></div></div>
                       <input type="checkbox" className="hidden" checked={offerConfig.includeHardware} onChange={e => setOfferConfig({...offerConfig, includeHardware: e.target.checked})}/>
+                    </label>
+                    
+                    <label className="flex items-center justify-between p-4 bg-stone-50 hover:bg-stone-100 rounded-2xl cursor-pointer transition-colors">
+                      <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">Pokaż usługi montażu</span>
+                      <div className={`w-10 h-6 rounded-full relative transition-colors ${offerConfig.includeServices ? 'bg-stone-800' : 'bg-stone-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${offerConfig.includeServices ? 'left-5' : 'left-1'}`}></div></div>
+                      <input type="checkbox" className="hidden" checked={offerConfig.includeServices} onChange={e => setOfferConfig({...offerConfig, includeServices: e.target.checked})}/>
                     </label>
                  </div>
 
@@ -1147,7 +1287,7 @@ const App = () => {
                     </div>
                   </div>
                   
-                  {/* Zestawienie Użytych Materiałów (Nowość) */}
+                  {/* Zestawienie Użytych Materiałów */}
                   {offerConfig.includeMaterials && projectMaterials.length > 0 && (
                     <RenderMaterialsOfferSection materials={projectMaterials} />
                   )}
@@ -1184,7 +1324,7 @@ const App = () => {
                     </table>
                   </div>
 
-                  {/* Podsumowanie Blatów (jeśli są) */}
+                  {/* Podsumowanie Blatów */}
                   {offerItems.some(i => i.category === 'blat') && (
                     <div className="mb-10 page-break-inside-avoid">
                       <h3 className="text-sm font-black text-stone-800 uppercase tracking-widest mb-4 border-l-4 border-stone-800 pl-3">Zestawienie Blatów Roboczych</h3>
@@ -1205,7 +1345,7 @@ const App = () => {
                     </div>
                   )}
 
-                  {/* Tabela Okuć (Opcjonalna) */}
+                  {/* Tabela Okuć */}
                   {offerConfig.includeHardware && hardwareItems.length > 0 && (
                     <div className="mb-10 page-break-inside-avoid">
                       <h3 className="text-sm font-black text-stone-800 uppercase tracking-widest mb-4 border-l-4 border-stone-800 pl-3">Wyszczególnienie Okuć i Akcesoriów</h3>
@@ -1264,7 +1404,7 @@ const App = () => {
                     <div className="w-full md:w-2/3 bg-stone-50 p-6 rounded-2xl">
                       <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-4 text-right">Podsumowanie Kosztów</h3>
                       <div className="pt-2 flex flex-col items-end">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Całkowity koszt inwestycji</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 mb-1">Szacowany koszt inwestycji</span>
                         <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-stone-900">{offerTotal.toLocaleString()}</span><span className="text-xl font-bold text-stone-500">PLN</span></div>
                       </div>
                     </div>
