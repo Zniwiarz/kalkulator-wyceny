@@ -58,6 +58,7 @@ const App = () => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [alertDialog, setAlertDialog] = useState({ isOpen: false, title: '', message: '' });
 
   // Stany globalne wyceny
   const [globalCalcMaterials, setGlobalCalcMaterials] = useState(true);
@@ -185,7 +186,15 @@ const App = () => {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Błąd logowania:", error);
-      alert("Nie udało się zalogować: " + error.message);
+      if (error.code === 'auth/unauthorized-domain') {
+        setAlertDialog({
+          isOpen: true,
+          title: "Brak autoryzacji domeny",
+          message: `Aby logowanie Google zadziałało, musisz dodać poniższy adres do autoryzowanych domen w swojej konsoli Firebase (Authentication -> Ustawienia -> Autoryzowane domeny):\n\n${window.location.hostname}`
+        });
+      } else {
+        setAlertDialog({ isOpen: true, title: "Błąd logowania", message: error.message });
+      }
     }
   };
 
@@ -234,10 +243,10 @@ const App = () => {
             await batchAdd('materials_db', data.materials);
             await batchAdd('projects', data.projects);
             
-            alert("Baza wczytana pomyślnie! Zamknij ten komunikat, aby zobaczyć zmiany.");
+            setAlertDialog({ isOpen: true, title: "Sukces", message: "Baza wczytana pomyślnie!" });
             e.target.value = ''; // Zresetuj input pliku
           } catch (err) {
-            alert("Błąd importu: Uszkodzony plik lub problem z bazą.");
+            setAlertDialog({ isOpen: true, title: "Błąd", message: "Błąd importu: Uszkodzony plik lub problem z bazą." });
           }
         };
         reader.readAsText(file);
@@ -364,7 +373,7 @@ const App = () => {
 
   const saveProjectToCloud = async (overwrite = false) => {
     if (!user) {
-      alert("Błąd zapisu! Brak połączenia z bazą.");
+      setAlertDialog({ isOpen: true, title: "Błąd", message: "Błąd zapisu! Brak połączenia z bazą." });
       return;
     }
     try {
@@ -374,7 +383,7 @@ const App = () => {
       setShowSaveModal(false);
     } catch (e) { 
       console.error("Błąd zapisu projektu:", e); 
-      alert("Wystąpił błąd podczas zapisywania projektu.");
+      setAlertDialog({ isOpen: true, title: "Błąd", message: "Wystąpił błąd podczas zapisywania projektu." });
     }
   };
 
@@ -669,7 +678,7 @@ const App = () => {
     return (
       <div className="min-h-screen bg-[#F4F1EA] flex flex-col items-center justify-center p-4">
         <style>{`@import url('https://fonts.googleapis.com/css2?family=Poiret+One&display=swap');`}</style>
-        <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full text-center border border-stone-200">
+        <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full text-center border border-stone-200 relative">
           <div className="bg-stone-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner border border-stone-700">
             <Calculator className="text-white" size={40} />
           </div>
@@ -1726,6 +1735,23 @@ const App = () => {
                 {currentProjectId ? 'Zapisz jako nowa kopia' : 'Zapisz w archiwum'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL KOMUNIKATÓW/BŁĘDÓW */}
+      {alertDialog.isOpen && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[110]">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 text-center border border-stone-200">
+            <h3 className="font-black text-xl mb-4 text-stone-800 uppercase tracking-tight flex items-center justify-center gap-2">
+              <AlertTriangle className="text-stone-800" size={24}/> {alertDialog.title}
+            </h3>
+            <div className="text-sm font-medium text-stone-600 mb-8 whitespace-pre-wrap leading-relaxed text-left bg-stone-50 p-4 rounded-2xl border border-stone-200">
+              {alertDialog.message}
+            </div>
+            <button onClick={() => setAlertDialog({ isOpen: false, title: '', message: '' })} className="w-full py-3.5 bg-stone-800 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md hover:bg-stone-900 transition-colors">
+              Zrozumiałem
+            </button>
           </div>
         </div>
       )}
