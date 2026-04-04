@@ -93,7 +93,7 @@ const App = () => {
     category: 'hanging', name: '', type: 'prosty', drawerCount: 1, 
     widthType: '600', customWidth: '', heightType: '720', customHeight: '', 
     depthType: '300', customDepth: '', hasFronts: true, frontCount: 1,
-    thickness: '38', customThickness: '', isEdged: true, boardMaterial: 'korpus', quantity: 1
+    thickness: '38', customThickness: '', edgeType: 'all', boardMaterial: 'korpus', quantity: 1
   });
 
   // --- HELPERY WYŚWIETLANIA ---
@@ -118,7 +118,15 @@ const App = () => {
 
   const getExtraInfo = (item) => {
     if (item.category === 'blat') return '';
-    if (item.category === 'formatka') return `${item.boardMaterial === 'front' ? 'Płyta frontowa' : 'Płyta korpusowa'} • ${item.isEdged ? 'Oklejone krawędzie' : 'Surowa'} • Ilość: ${item.quantity || 1} szt.`;
+    if (item.category === 'formatka') {
+      const type = item.edgeType || (item.isEdged ? 'all' : 'none');
+      let edgeText = 'Surowa';
+      if (type === 'all') edgeText = 'Oklejone dookoła';
+      else if (type === 'width') edgeText = 'Oklejone (1x szerokość)';
+      else if (type === 'length') edgeText = 'Oklejone (1x długość)';
+      
+      return `${item.boardMaterial === 'front' ? 'Płyta frontowa' : 'Płyta korpusowa'} • ${edgeText} • Ilość: ${item.quantity || 1} szt.`;
+    }
     return item.hasFronts ? `${item.frontCount} front(y)` : 'Brak frontów';
   };
 
@@ -295,8 +303,14 @@ const App = () => {
        if (item.boardMaterial === 'front') frontM2 = area;
        else plateM2 = area;
 
-       if (item.isEdged) totalEdging = (W + H) * 2 * qty; 
+       // Obliczanie cięcia i oklejania na podstawie nowego formatu
        totalCutting = (W + H) * 2 * qty; 
+       
+       const formatkaEdgeType = item.edgeType || (item.isEdged ? 'all' : 'none');
+       if (formatkaEdgeType === 'all') totalEdging = (W + H) * 2 * qty;
+       else if (formatkaEdgeType === 'width') totalEdging = W * qty; // 1x Szerokość
+       else if (formatkaEdgeType === 'length') totalEdging = H * qty; // 1x Długość
+       else totalEdging = 0;
 
        let formatkaFrontPrice = frontType === 'mat' ? settings.frontMatPriceM2 : frontType === 'lakier' ? settings.frontLakierPriceM2 : frontType === 'ryflowany' ? settings.frontRyflowanyPriceM2 : settings.frontStandardPriceM2;
 
@@ -362,7 +376,7 @@ const App = () => {
   const offerTotal = Math.ceil(rawOfferTotal / 10) * 10;
 
   // --- AKCJE I FUNKCJE ---
-  const resetBuilder = () => { setCurrentFurniture({ category: 'hanging', name: '', type: 'prosty', drawerCount: 1, widthType: '600', customWidth: '', heightType: '720', customHeight: '', depthType: '300', customDepth: '', hasFronts: true, frontCount: 1, thickness: '38', customThickness: '', isEdged: true, boardMaterial: 'korpus', quantity: 1 }); setBuilderStep(1); setEditingId(null); };
+  const resetBuilder = () => { setCurrentFurniture({ category: 'hanging', name: '', type: 'prosty', drawerCount: 1, widthType: '600', customWidth: '', heightType: '720', customHeight: '', depthType: '300', customDepth: '', hasFronts: true, frontCount: 1, thickness: '38', customThickness: '', edgeType: 'all', boardMaterial: 'korpus', quantity: 1 }); setBuilderStep(1); setEditingId(null); };
 
   const handleAddToQuote = () => {
     const newItem = { ...currentFurniture, id: editingId || Date.now() };
@@ -446,6 +460,7 @@ const App = () => {
           name: i.name, category: i.category, widthType: i.widthType, customWidth: i.customWidth, 
           heightType: i.heightType, customHeight: i.customHeight, depthType: i.depthType, customDepth: i.customDepth, 
           thickness: i.thickness, customThickness: i.customThickness, quantity: i.quantity || 1,
+          edgeType: i.edgeType || (i.isEdged ? 'all' : 'none'), boardMaterial: i.boardMaterial,
           totalPrice: i.totalPrice, raw: i.raw
         })),
         hardware: offerConfig.includeHardware ? hardwareItems.map(h => ({ name: h.name, category: h.category, quantity: h.quantity, unitPrice: h.unitPrice, imageUrl: h.imageUrl || '', linkUrl: h.linkUrl || '' })) : [],
@@ -1601,7 +1616,7 @@ const App = () => {
                      <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'hanging', heightType: '720', depthType: '300'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowUpToLine size={24}/></div> Szafka Wisząca</button>
                      <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'standing', heightType: '720', depthType: '510'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-stone-800 hover:bg-stone-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><ArrowDownToLine size={24}/></div> Szafka Stojąca</button>
                      <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'blat', widthType: '2000', depthType: '600', thickness: '38'})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-amber-600 hover:bg-amber-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Ruler size={24}/></div> Blat Roboczy</button>
-                     <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'formatka', widthType: '600', heightType: '720', isEdged: true, boardMaterial: 'korpus', quantity: 1})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-orange-600 hover:bg-orange-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Layers size={24}/></div> Poj. Formatka</button>
+                     <button onClick={() => { setCurrentFurniture(p => ({...p, category: 'formatka', widthType: '600', heightType: '720', edgeType: 'all', boardMaterial: 'korpus', quantity: 1})); setBuilderStep(2); }} className="p-6 border-2 border-stone-200 rounded-3xl font-black text-sm flex flex-col items-center gap-3 hover:border-orange-600 hover:bg-orange-50 transition-all text-stone-600 uppercase tracking-widest"><div className="bg-stone-100 text-stone-400 p-4 rounded-2xl"><Layers size={24}/></div> Poj. Formatka</button>
                    </div>
                  </div>
                )}
@@ -1735,11 +1750,28 @@ const App = () => {
                       </div>
                     </div>
 
-                    <label className={`flex items-center justify-between p-6 rounded-2xl cursor-pointer border-2 transition-all ${currentFurniture.isEdged ? 'bg-green-50 border-green-200' : 'bg-stone-50 border-stone-200'}`}>
-                      <span className={`font-black uppercase tracking-widest text-sm ${currentFurniture.isEdged ? 'text-green-800' : 'text-stone-500'}`}>Oklejanie krawędzi (dokooła)</span>
-                      <div className={`w-14 h-8 rounded-full relative transition-colors ${currentFurniture.isEdged ? 'bg-green-500' : 'bg-stone-300'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${currentFurniture.isEdged ? 'left-7' : 'left-1'}`}></div></div>
-                      <input type="checkbox" className="hidden" checked={currentFurniture.isEdged} onChange={e => setCurrentFurniture({...currentFurniture, isEdged: e.target.checked})} />
-                    </label>
+                    <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4">Oklejanie krawędzi</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { id: 'none', label: 'Brak (Surowa)' },
+                          { id: 'all', label: 'Dookoła' },
+                          { id: 'width', label: '1x Szerokość' },
+                          { id: 'length', label: '1x Długość' }
+                        ].map(opt => {
+                          const currentEdge = currentFurniture.edgeType || (currentFurniture.isEdged ? 'all' : 'none');
+                          return (
+                            <button 
+                              key={opt.id}
+                              onClick={() => setCurrentFurniture({...currentFurniture, edgeType: opt.id, isEdged: opt.id === 'all'})} 
+                              className={`p-3 rounded-xl font-black text-[11px] uppercase transition-all ${currentEdge === opt.id ? 'bg-green-600 text-white shadow-md border-green-600' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-100'} border-2`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                  </div>
                )}
 
